@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Body Shop Parts Receiving</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+<script src="config.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f3f4f6;
+            color: #222;
+        }
+
+        header {
+            background: #111827;
+            color: white;
+            padding: 20px;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        header p {
+            margin: 6px 0 0;
+            color: #d1d5db;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        h2 {
+            margin-top: 0;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 6px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .full {
+            grid-column: 1 / -1;
+        }
+
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 14px 22px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            text-align: left;
+        }
+
+        th {
+            background: #f9fafb;
+        }
+
+        .empty {
+            color: #6b7280;
+            text-align: center;
+            padding: 25px;
+        }
+
+        @media (max-width: 700px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .full {
+                grid-column: auto;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>Body Shop Parts Receiving</h1>
+    <p>Parts Department</p>
+</header>
+
+<div class="container">
+
+    <div class="card">
+        <h2>Receive Part</h2>
+
+        <div class="form-grid">
+
+            <div>
+                <label for="roNumber">Repair Order #</label>
+                <input
+                    type="text"
+                    id="roNumber"
+                    placeholder="Example: 45821"
+                >
+            </div>
+
+            <div>
+             <label for="partNumber">Part Number / Scan Barcode</label>
+
+<button type="button" onclick="startBarcodeScanner()">
+    📷 SCAN BARCODE
+</button>
+
+<div id="reader" style="width: 100%; max-width: 500px; margin-top: 15px; display: none;"></div>
+
+<input
+    type="text"
+    id="partNumber"
+    placeholder="Scan or enter part number"
+    autofocus
+    onchange="lookupPart()"
+>
+
+<div id="partInfo" style="margin-top: 8px; color: #2563eb; font-weight: bold;">
+    Part description will appear here
+</div>
+                
+            </div>
+
+            <div>
+                <label for="quantity">Quantity</label>
+                <input
+                    type="number"
+                    id="quantity"
+                    value="1"
+                    min="1"
+                >
+            </div>
+
+            <div>
+                <label for="location">Rack / Location</label>
+                <input
+                    type="text"
+                    id="location"
+                    placeholder="Example: A-12"
+                >
+            </div>
+
+            <div class="full">
+                <button onclick="receivePart()">
+                    RECEIVE PART
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Recently Received</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>RO #</th>
+                    <th>Part Number</th>
+                    <th>Description</th>
+                    <th>Qty</th>
+                    <th>Location</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+
+            <tbody id="partsTable">
+                <tr>
+                    <td colspan="6" class="empty">
+                        No parts received yet.
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+
+    const supabaseClient = window.supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_KEY
+    );
+
+
+    async function lookupPart() {
+
+        const partNumber = document
+            .getElementById("partNumber")
+            .value
+            .trim();
+
+        const partInfo = document.getElementById("partInfo");
+
+        if (!partNumber) {
+            partInfo.textContent = "Part description will appear here";
+            return;
+        }
+
+        partInfo.textContent = "Looking up part...";
+
+        const { data, error } = await supabaseClient
+            .from("parts_catalog")
+            .select("part_number, manufacturer, part_name")
+            .eq("part_number", partNumber)
+            .maybeSingle();
+
+        if (error) {
+            console.error(error);
+            partInfo.textContent = "Error looking up part.";
+            return;
+        }
+
+        if (!data) {
+            partInfo.textContent = "Part not found in catalog.";
+            return;
+        }
+
+        partInfo.textContent =
+            `${data.manufacturer} — ${data.part_name}`;
+    }
+
+
+    async function receivePart() {
+
+        const roNumber = document.getElementById("roNumber").value.trim();
+        const partNumber = document.getElementById("partNumber").value.trim();
+        const quantity = document.getElementById("quantity").value;
+        const location = document.getElementById("location").value.trim();
+
+        if (!roNumber) {
+            alert("Please enter the Repair Order number.");
+            return;
+        }
+
+        if (!partNumber) {
+            alert("Please scan or enter the part number.");
+            return;
+        }
+
+        if (!location) {
+            alert("Please enter the part location.");
+            return;
+        }
+
+        const { data, error } = await supabaseClient
+            .from("parts")
+            .insert([
+                {
+                    ro_number: roNumber,
+                    part_number: partNumber,
+                    quantity: Number(quantity),
+                    location: location
+                }
+            ])
+            .select();
+
+        if (error) {
+            console.error(error);
+            alert(
+                "There was a problem saving the part:\n\n" +
+                error.message
+            );
+            return;
+        }
+
+        await addPartToScreen(data[0]);
+
+        document.getElementById("partNumber").value = "";
+        document.getElementById("partInfo").textContent =
+            "Part description will appear here";
+
+        document.getElementById("partNumber").focus();
+
+        alert("Part received and saved!");
+    }
+
+
+    async function addPartToScreen(part) {
+
+        const table = document.getElementById("partsTable");
+
+        const emptyRow = table.querySelector(".empty");
+
+        if (emptyRow) {
+            emptyRow.parentElement.remove();
+        }
+
+        const { data: catalogPart, error } = await supabaseClient
+            .from("parts_catalog")
+            .select("manufacturer, part_name")
+            .eq("part_number", part.part_number)
+            .maybeSingle();
+
+        if (error) {
+            console.error("Catalog lookup error:", error);
+        }
+
+        let description = "Unknown part";
+
+        if (catalogPart) {
+            description =
+                `${catalogPart.manufacturer} — ${catalogPart.part_name}`;
+        }
+
+        const date = new Date(part.received_at);
+
+        const time = date.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit"
+        });
+
+        const row = document.createElement("tr");
+
+        row.innerHTML = `
+            <td>${part.ro_number}</td>
+            <td>${part.part_number}</td>
+            <td>${description}</td>
+            <td>${part.quantity}</td>
+            <td>${part.location}</td>
+            <td>${time}</td>
+        `;
+
+        table.prepend(row);
+    }
+
+
+    async function loadRecentParts() {
+
+        const { data, error } = await supabaseClient
+            .from("parts")
+            .select("*")
+            .order("received_at", { ascending: false })
+            .limit(25);
+
+        if (error) {
+            console.error("Error loading parts:", error);
+            return;
+        }
+
+        const table = document.getElementById("partsTable");
+
+        table.innerHTML = "";
+
+        if (!data || data.length === 0) {
+            table.innerHTML = `
+                <tr>
+                    <td colspan="6" class="empty">
+                        No parts received yet.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        for (const part of data) {
+            await addPartToScreen(part);
+        }
+    }
+
+
+    // Load saved parts when the page opens
+    async function startBarcodeScanner() {
+
+    const reader = document.getElementById("reader");
+
+    reader.style.display = "block";
+
+    const scanner = new Html5Qrcode("reader");
+
+    try {
+
+        await scanner.start(
+            { facingMode: "environment" },
+
+            {
+                fps: 15,
+                qrbox: {
+                    width: 350,
+                    height: 120
+                },
+                aspectRatio: 2.5
+            },
+
+            async (decodedText) => {
+
+                console.log("Barcode scanned:", decodedText);
+
+                document.getElementById("partNumber").value =
+                    decodedText.trim();
+
+                await lookupPart();
+
+                await scanner.stop();
+
+                reader.style.display = "none";
+            },
+
+            (errorMessage) => {
+                // Scanner is still looking.
+                // We don't need to show an error for every frame.
+            }
+        );
+
+    } catch (error) {
+
+        console.error("Camera error:", error);
+
+        alert(
+            "Could not start the camera.\n\n" +
+            "Make sure you allow camera access when your browser asks."
+        );
+
+        reader.style.display = "none";
+    }
+}
+    
+
+loadRecentParts();
+
+</script>
