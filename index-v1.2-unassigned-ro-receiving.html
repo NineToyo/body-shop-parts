@@ -1,0 +1,3809 @@
+<!DOCTYPE html> <html lang="en"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lynch Toyota | Body Shop Parts</title>
+
+<!-- Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- Barcode Scanner -->
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+<!-- PDF Reader for Auto/Mate Parts List Import -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+<!-- Your Supabase configuration -->
+<script src="config.js"></script>
+
+<style>
+:root{
+    --toyota-red:#e50000;
+    --toyota-red-dark:#b80000;
+    --ink:#15171a;
+    --muted:#6b7280;
+    --line:#e6e8eb;
+    --surface:#ffffff;
+    --soft:#f5f6f7;
+    --success:#15803d;
+    --danger:#c81e1e;
+    --shadow:0 10px 30px rgba(17,24,39,.07);
+}
+*{box-sizing:border-box}
+html{background:#f4f5f6}
+body{
+    margin:0;
+    font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    background:linear-gradient(180deg,#eef0f2 0,#f7f8f9 230px,#f4f5f6 100%);
+    color:var(--ink);
+    min-height:100vh;
+}
+header{
+    background:#0f1114;
+    color:#fff;
+    padding:0;
+    border-top:5px solid var(--toyota-red);
+    box-shadow:0 4px 20px rgba(0,0,0,.18);
+}
+header::before{
+    content:"LYNCH TOYOTA";
+    display:block;
+    max-width:1200px;
+    margin:0 auto;
+    padding:22px 24px 3px;
+    font-size:12px;
+    font-weight:900;
+    letter-spacing:.22em;
+    color:#ff3b30;
+}
+header h1{
+    max-width:1200px;
+    margin:0 auto;
+    padding:0 24px;
+    font-size:clamp(24px,4vw,34px);
+    line-height:1.1;
+    letter-spacing:-.03em;
+}
+header p{
+    max-width:1200px;
+    margin:0 auto;
+    padding:7px 24px 22px;
+    color:#b8bdc5;
+    font-size:14px;
+}
+.nav{
+    background:rgba(255,255,255,.96);
+    backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--line);
+    display:flex;
+    gap:6px;
+    padding:10px max(18px,calc((100vw - 1200px)/2 + 18px));
+    position:sticky;
+    top:0;
+    z-index:100;
+    box-shadow:0 2px 12px rgba(17,24,39,.04);
+}
+.nav button{
+    background:transparent;
+    color:#3f444c;
+    border:0;
+    padding:11px 14px;
+    border-radius:9px;
+    font-size:14px;
+    font-weight:800;
+    cursor:pointer;
+    transition:.18s ease;
+}
+.nav button:hover{background:#f1f2f4;color:#111}
+.nav button.active{
+    background:var(--toyota-red);
+    color:#fff;
+    box-shadow:0 5px 14px rgba(229,0,0,.22);
+}
+.auth-bar{
+    max-width:1200px;
+    margin:18px auto 0;
+    padding:0 20px;
+}
+.auth-card{
+    background:#fff;
+    border:1px solid var(--line);
+    border-left:4px solid var(--toyota-red);
+    border-radius:12px;
+    padding:14px 16px;
+    box-shadow:0 5px 18px rgba(17,24,39,.05);
+}
+.auth-row{display:flex;gap:10px;align-items:end;flex-wrap:wrap}
+.auth-field{flex:1 1 220px}
+.auth-field label{display:block;margin-bottom:6px;font-weight:800}
+.auth-status{color:#60656d;font-weight:750;margin-bottom:10px;font-size:14px}
+.admin-only-hidden{display:none!important}
+.container{max-width:1200px;margin:22px auto 45px;padding:0 20px}
+.page{display:none}
+.page.active{display:block;animation:pageIn .2s ease}
+@keyframes pageIn{from{opacity:.4;transform:translateY(3px)}to{opacity:1;transform:none}}
+.card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:15px;
+    padding:24px;
+    margin-bottom:18px;
+    box-shadow:var(--shadow);
+}
+.card h2{
+    margin:0 0 18px;
+    font-size:21px;
+    letter-spacing:-.02em;
+}
+.card h2::after{
+    content:"";
+    display:block;
+    width:34px;
+    height:3px;
+    margin-top:9px;
+    background:var(--toyota-red);
+    border-radius:99px;
+}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.full{grid-column:1/-1}
+label{
+    display:block;
+    font-size:13px;
+    font-weight:850;
+    color:#3d4249;
+    margin-bottom:7px;
+}
+input,select{
+    width:100%;
+    padding:12px 13px;
+    border:1px solid #cfd3d8;
+    border-radius:9px;
+    font-size:16px;
+    background:#fff;
+    color:#16181b;
+    transition:.15s ease;
+}
+input:hover,select:hover{border-color:#aeb4bb}
+input:focus,select:focus{
+    outline:none;
+    border-color:var(--toyota-red);
+    box-shadow:0 0 0 3px rgba(229,0,0,.10);
+}
+.button-row,.actions{display:flex;gap:9px;flex-wrap:wrap}
+button{
+    border:0;
+    border-radius:9px;
+    padding:12px 16px;
+    font-size:14px;
+    font-weight:850;
+    letter-spacing:.01em;
+    cursor:pointer;
+    transition:transform .12s ease,box-shadow .12s ease,background .12s ease;
+}
+button:active{transform:translateY(1px)}
+.primary{
+    background:var(--toyota-red);
+    color:#fff;
+    box-shadow:0 4px 12px rgba(229,0,0,.18);
+}
+.primary:hover{background:var(--toyota-red-dark)}
+.secondary{background:#eceef0;color:#202327}
+.secondary:hover{background:#dfe2e5}
+.danger{background:var(--danger);color:#fff}
+.danger:hover{background:#a91414}
+.active-ro{
+    margin-top:9px;
+    color:var(--success);
+    font-weight:850;
+    font-size:14px;
+}
+#scannerContainer,
+#catalogScannerContainer{
+    display:none;
+    position:relative;
+    width:100%;
+    max-width:520px;
+    margin-top:15px;
+    background:#050505;
+    border-radius:14px;
+    overflow:hidden;
+    box-shadow:0 10px 28px rgba(0,0,0,.22);
+}
+#reader,
+#catalogReader{width:100%}
+.scanner-box{
+    position:absolute;
+    top:50%;left:5%;
+    width:90%;height:100px;
+    transform:translateY(-50%);
+    border:3px solid #ff2d2d;
+    border-radius:10px;
+    pointer-events:none;
+    z-index:10;
+    box-shadow:0 0 0 9999px rgba(0,0,0,.18);
+}
+.part-info{margin-top:8px;color:#b00000;font-weight:850}
+.table-wrapper{
+    overflow-x:auto;
+    border:1px solid var(--line);
+    border-radius:11px;
+    background:#fff;
+}
+table{width:100%;border-collapse:collapse;margin:0}
+th,td{padding:13px 14px;border-bottom:1px solid #eceef0;text-align:left}
+th{
+    background:#f2f3f4;
+    color:#555b63;
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:.055em;
+    font-weight:900;
+}
+tbody tr:last-child td{border-bottom:0}
+tr:hover td{background:#fafafa}
+.empty{color:#7a8088;text-align:center;padding:32px}
+.tech-lookup-form{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end}
+.tech-search-button{min-height:47px}
+.tech-lookup-status{margin-top:15px;color:#6b7280;font-weight:800}
+.tech-lookup-status.success{color:#166534}
+.tech-lookup-status.error{color:#991b1b}
+.tech-results-header{display:flex;justify-content:space-between;align-items:center;gap:15px}
+.tech-results-header h2{margin-bottom:0}
+.tech-location{font-weight:850}
+.catalog-count{color:#6b7280;margin-top:12px;font-size:14px}
+.status{
+    display:none;
+    margin-top:15px;
+    padding:12px 14px;
+    border-radius:9px;
+    font-weight:800;
+    border:1px solid transparent;
+}
+.status.success{display:block;background:#edf8f0;color:#166534;border-color:#cdebd5}
+.status.error{display:block;background:#fff0f0;color:#991b1b;border-color:#ffd1d1}
+.tech-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+    gap:11px;
+    margin-top:18px;
+}
+.tech-button{
+    min-height:66px;
+    background:#f1f2f3;
+    border:1px solid #dde0e3;
+    color:#202327;
+    font-size:16px;
+}
+.tech-button:hover{background:#fff;border-color:var(--toyota-red);box-shadow:0 5px 14px rgba(17,24,39,.08)}
+.ro-card{
+    border:1px solid #e0e3e6;
+    border-left:4px solid var(--toyota-red);
+    border-radius:10px;
+    padding:16px;
+    margin-top:12px;
+    cursor:pointer;
+    background:#fafafa;
+    transition:.15s ease;
+}
+.ro-card:hover{background:#fff;box-shadow:0 6px 16px rgba(17,24,39,.07)}
+.ro-card strong{font-size:18px}
+@media(max-width:700px){
+    header::before{padding:18px 18px 3px}
+    header h1{padding:0 18px;font-size:26px}
+    header p{padding:6px 18px 18px}
+    .nav{overflow-x:auto;padding:8px 12px;gap:4px}
+    .nav button{white-space:nowrap;padding:10px 12px;font-size:13px}
+    .auth-bar{padding:0 12px;margin-top:12px}
+    .container{padding:0 12px;margin-top:14px}
+    .card{padding:18px 15px;border-radius:12px}
+    .form-grid,.tech-lookup-form{grid-template-columns:1fr}
+    .tech-search-button{width:100%}
+    .tech-results-header{align-items:stretch;flex-direction:column}
+    .tech-results-header button{width:100%}
+    .full{grid-column:auto}
+    .actions{flex-direction:column}
+    th,td{white-space:nowrap}
+    button{min-height:44px}
+}
+</style>
+
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f1114">
+<link rel="apple-touch-icon" href="icon-192.png">
+</head> <body> <header> <h1>Body Shop Parts</h1> <p>Parts Department • Internal Operations</p> </header> <!-- NAVIGATION --> <nav class="nav">
+<button
+    id="navReceive"
+    class="active"
+    onclick="showPage('receivePage', this)"
+>
+    📦 Receive Parts
+</button>
+
+<button
+    id="navCatalog"
+    onclick="showPage('catalogPage', this)"
+>
+    📋 Parts Catalog
+</button>
+
+<button
+    id="navImportHistory"
+    onclick="showPage('importHistoryPage', this)"
+    style="display:none;"
+>
+    🗂️ Import History
+</button>
+
+
+<button
+    id="navReceived"
+    onclick="showPage('receivedPage', this)"
+>
+    📍 Parts Received
+</button>
+
+<button
+    id="navROAssignments"
+    onclick="showPage('roAssignmentsPage', this)"
+>
+    👤 Assign ROs
+</button>
+
+<button
+    id="navTechLookup"
+    onclick="showPage('techLookupPage', this)"
+>
+    🔎 Tech Lookup
+</button>
+
+</nav>
+
+<div class="auth-bar">
+    <div class="auth-card">
+        <div id="adminLoggedOut">
+            <div class="auth-status">Technician mode — Admin changes are locked.</div>
+            <button type="button" class="secondary" onclick="showAdminLogin()">ADMIN LOGIN</button>
+
+            <div id="adminLoginForm" style="display:none; margin-top:12px;">
+                <div class="auth-row">
+                    <div class="auth-field">
+                        <label for="adminEmail">Email</label>
+                        <input id="adminEmail" type="email" autocomplete="username" placeholder="Admin email">
+                    </div>
+                    <div class="auth-field">
+                        <label for="adminPassword">Password</label>
+                        <input id="adminPassword" type="password" autocomplete="current-password" placeholder="Password">
+                    </div>
+                    <div>
+                        <button type="button" class="primary" onclick="adminLogin()">LOGIN</button>
+                    </div>
+                </div>
+                <div id="adminLoginStatus" class="status"></div>
+            </div>
+        </div>
+
+        <div id="adminLoggedIn" style="display:none;">
+            <div id="adminSessionStatus" class="auth-status">Admin mode</div>
+            <button type="button" class="secondary" onclick="adminLogout()">LOG OUT</button>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+<!-- ===================================================== -->
+<!-- RECEIVE PARTS -->
+<!-- ===================================================== -->
+
+<section id="receivePage" class="page active">
+
+    <div class="card">
+
+        <h2>Receive Part</h2>
+
+        <div class="form-grid">
+
+            <!-- RO -->
+
+            <div>
+
+                <label for="roNumber">
+                    Repair Order #
+                </label>
+
+                <input
+                    type="text"
+                    id="roNumber"
+                    placeholder="Example: 45821"
+                >
+
+                <div
+                    id="activeRO"
+                    class="active-ro"
+                >
+                    No active RO
+                </div>
+
+                <button
+                    type="button"
+                    class="secondary"
+                    onclick="setActiveRO()"
+                    style="margin-top: 8px;"
+                >
+                    SET ACTIVE RO
+                </button>
+
+            </div>
+
+            <!-- PART NUMBER -->
+
+            <div>
+
+                <label for="partNumber">
+                    Part Number / Scan Barcode
+                </label>
+
+                <div class="button-row">
+
+                    <button
+                        type="button"
+                        class="primary"
+                        onclick="startBarcodeScanner()"
+                    >
+                        📷 SCAN BARCODE
+                    </button>
+
+                </div>
+
+                <!-- CAMERA -->
+
+                <div id="scannerContainer">
+
+                    <div id="reader"></div>
+
+                    <div class="scanner-box"></div>
+
+                </div>
+
+                <input
+                    type="text"
+                    id="partNumber"
+                    placeholder="Scan or enter part number"
+                    onchange="lookupPart()"
+                >
+
+                <div
+                    id="partInfo"
+                    class="part-info"
+                >
+                    Part description will appear here
+                </div>
+
+            </div>
+
+            <!-- QUANTITY -->
+
+            <div>
+
+                <label for="quantity">
+                    Quantity
+                </label>
+
+                <input
+                    type="number"
+                    id="quantity"
+                    value="1"
+                    min="1"
+                >
+
+            </div>
+
+            <!-- LOCATION -->
+
+            <div>
+
+                <label for="location">
+                    Rack / Location
+                </label>
+
+                <input
+                    type="text"
+                    id="location"
+                    placeholder="Example: A-12"
+                >
+
+            </div>
+
+            <!-- RECEIVE -->
+
+            <div class="full">
+
+                <button
+                    class="primary"
+                    onclick="receivePart()"
+                >
+                    RECEIVE PART
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- RECENT PARTS -->
+
+    <div class="card">
+
+        <h2>Recently Received</h2>
+
+        <div class="table-wrapper">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+                        <th>RO #</th>
+                        <th>Part Number</th>
+                        <th>Description</th>
+                        <th>Qty</th>
+                        <th>Location</th>
+                        <th>Time</th>
+                    </tr>
+
+                </thead>
+
+                <tbody id="partsTable">
+
+                    <tr>
+                        <td
+                            colspan="6"
+                            class="empty"
+                        >
+                            Loading...
+                        </td>
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</section>
+
+<!-- ===================================================== -->
+<!-- PARTS CATALOG -->
+<!-- ===================================================== -->
+
+<section id="catalogPage" class="page">
+
+    <!-- ADD / EDIT -->
+
+    <div class="card" id="catalogAdminCard">
+
+        <h2 id="formTitle">
+            Add Part
+        </h2>
+
+        <div class="form-grid">
+
+            <div>
+
+                <label for="catalogPartNumber">
+                    Part Number
+                </label>
+
+                <div class="button-row" style="margin-bottom: 10px;">
+
+                    <button
+                        type="button"
+                        class="primary"
+                        onclick="startCatalogBarcodeScanner()"
+                    >
+                        📷 SCAN BARCODE
+                    </button>
+
+                </div>
+
+                <div id="catalogScannerContainer">
+
+                    <div id="catalogReader"></div>
+
+                    <div class="scanner-box"></div>
+
+                </div>
+
+                <input
+                    type="text"
+                    id="catalogPartNumber"
+                    placeholder="Scan or enter part number"
+                >
+
+            </div>
+
+            <div>
+
+                <label for="manufacturer">
+                    Manufacturer
+                </label>
+
+                <input
+                    type="text"
+                    id="manufacturer"
+                    placeholder="Example: Toyota"
+                >
+
+            </div>
+
+            <div class="full">
+
+                <label for="partName">
+                    Part Name / Description
+                </label>
+
+                <input
+                    type="text"
+                    id="partName"
+                    placeholder="Example: Front Bumper Cover"
+                >
+
+            </div>
+
+            <div class="full">
+
+                <div class="button-row">
+
+                    <button
+                        class="primary"
+                        id="saveButton"
+                        onclick="savePart()"
+                    >
+                        ADD PART
+                    </button>
+
+                    <button
+                        class="secondary"
+                        id="cancelButton"
+                        onclick="cancelEdit()"
+                        style="display: none;"
+                    >
+                        CANCEL
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div
+            id="statusMessage"
+            class="status"
+        ></div>
+
+        <hr style="border:0; border-top:1px solid #e5e7eb; margin:28px 0 22px;">
+
+        <!-- ADMIN PDF IMPORT: intentionally inside catalogAdminCard so it follows the same proven Admin visibility path as Add Part -->
+        <div id="catalogImportCard">
+        <h2 style="margin-bottom:6px;">Import Auto/Mate Parts List</h2>
+        <p style="color:#6b7280; margin-top:0;">
+            Upload an Auto/Mate Part Preview PDF. The app will read the RO, part numbers, descriptions and quantities, then add the parts to the catalog. Importing does not mark parts received or send notifications.
+        </p>
+
+        <div class="form-grid">
+            <div class="full">
+                <label for="partsListPdf">Auto/Mate Part Preview PDF</label>
+                <input id="partsListPdf" type="file" accept="application/pdf,.pdf" onchange="previewPartsListPdf(this.files[0])">
+            </div>
+
+            <div class="full">
+                <div id="partsImportPreview" class="status"></div>
+            </div>
+
+            <div class="full">
+                <div class="button-row">
+                    <button type="button" class="primary" id="importPartsButton" onclick="importPreviewedParts()" disabled>
+                        IMPORT PARTS TO CATALOG
+                    </button>
+                    <button type="button" class="secondary" onclick="clearPartsImport()">
+                        CLEAR
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        </div>
+
+        <hr style="border:0; border-top:1px solid #e5e7eb; margin:28px 0 22px;">
+
+        <!-- ADMIN AUTO/MATE ACTIVE RO SYNC: inside catalogAdminCard so it uses proven Admin visibility -->
+        <div id="catalogROSyncCard">
+            <h2 style="margin-bottom:6px;">Update Technician ROs from Auto/Mate</h2>
+            <p style="color:#6b7280; margin-top:0;">
+                Upload the current Auto/Mate <strong>Repair Order List</strong> PDF. Auto/Mate decides which ROs are active; the Collision Tracker continues to supply the technician assignment. Open ROs appear under their assigned tech.
+            </p>
+            <div class="form-grid">
+                <div class="full">
+                    <label for="roListPdf">Auto/Mate Repair Order List PDF</label>
+                    <input id="roListPdf" type="file" accept="application/pdf,.pdf" onchange="previewROListPdf(this.files[0])">
+                </div>
+                <div class="full"><div id="roSyncPreview" class="status"></div></div>
+                <div class="full">
+                    <div class="button-row">
+                        <button id="syncROListButton" class="primary" onclick="syncPreviewedROList()" disabled>UPDATE TECH ROs</button>
+                        <button class="secondary" onclick="clearROListSync()">CLEAR</button>
+                    </div>
+                </div>
+            </div>
+            <p style="color:#6b7280; font-size:13px; margin-bottom:0;">
+                Open = active. Invoiced and Void = inactive. ROs not listed as Open in the newest report are removed from the technicians' active RO lists.
+            </p>
+        </div>
+
+    </div>
+
+    <!-- SEARCH / CATALOG -->
+
+    <div class="card">
+
+        <h2>Parts Catalog</h2>
+
+        <input
+            type="text"
+            id="searchInput"
+            placeholder="Search part number, manufacturer, or description..."
+            oninput="loadCatalog()"
+        >
+
+        <div
+            id="catalogCount"
+            class="catalog-count"
+        >
+            Loading catalog...
+        </div>
+
+        <div class="table-wrapper">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+                        <th>Part Number</th>
+                        <th>Manufacturer</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                    </tr>
+
+                </thead>
+
+                <tbody id="catalogTable">
+
+                    <tr>
+                        <td
+                            colspan="4"
+                            class="empty"
+                        >
+                            Loading catalog...
+                        </td>
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</section>
+
+<!-- ===================================================== -->
+<!-- ADMIN IMPORT HISTORY -->
+<!-- ===================================================== -->
+<section id="importHistoryPage" class="page">
+    <div class="card">
+        <h2>Imported Parts Lists</h2>
+        <p style="color:#6b7280;">Admin-only history of Auto/Mate RO files successfully imported into the Parts Catalog.</p>
+        <div class="table-wrapper">
+            <table>
+                <thead><tr><th>RO #</th><th>Parts</th><th>Imported</th></tr></thead>
+                <tbody id="importHistoryTable"><tr><td colspan="3" class="empty">Loading import history...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- ===================================================== -->
+<!-- PARTS RECEIVED -->
+<!-- ===================================================== -->
+
+<section id="receivedPage" class="page">
+
+    <div class="card">
+
+        <h2>Parts Received</h2>
+
+        <p style="color:#6b7280;">
+            All parts that have been received are shown here.
+        </p>
+
+        <div class="table-wrapper">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+                        <th>RO #</th>
+                        <th>Part Number</th>
+                        <th>Description</th>
+                        <th>Qty</th>
+                        <th>Location</th>
+                        <th>Received</th><th>Actions</th>
+                    </tr>
+
+                </thead>
+
+                <tbody id="allPartsTable">
+
+                    <tr>
+                        <td
+                            colspan="7"
+                            class="empty"
+                        >
+                            Loading...
+                        </td>
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</section>
+
+<!-- ===================================================== -->
+<!-- RO ASSIGNMENTS -->
+<!-- ===================================================== -->
+
+<section id="roAssignmentsPage" class="page">
+    <div class="card">
+        <h2>Assign Repair Order</h2>
+        <p style="color:#6b7280;">Assign each RO to the technician working on that vehicle.</p>
+        <div class="form-grid">
+            <div>
+                <label for="assignmentRO">Repair Order #</label>
+                <input type="text" id="assignmentRO" placeholder="Example: 45821" autocomplete="off">
+            </div>
+            <div>
+                <label for="assignmentTech">Technician</label>
+                <select id="assignmentTech">
+                    <option value="">Choose technician...</option>
+                    <option>Mike</option><option>Cameron</option><option>Sandro</option><option>Dustin</option>
+                    <option>Mark</option><option>Anthony</option><option>Josh</option><option>Collin</option>
+                    <option>Pete</option><option>Brian</option>
+                </select>
+            </div>
+            <div class="full">
+                <button class="primary" onclick="assignRepairOrder()">SAVE RO ASSIGNMENT</button>
+            </div>
+        </div>
+        <div id="assignmentStatus" class="status"></div>
+    </div>
+
+    <div class="card">
+        <div class="tech-results-header">
+            <div>
+                <h2>ROs With No Tech</h2>
+                <div id="unassignedROCount" class="catalog-count">Loading...</div>
+            </div>
+            <button type="button" class="secondary" onclick="loadUnassignedROs()">REFRESH</button>
+        </div>
+        <p style="color:#6b7280; margin-top:0;">
+            These ROs are Open in Auto/Mate but are not in the Collision Tracker with a technician yet. Assign a tech here and the RO will immediately appear on that technician's side.
+        </p>
+        <div id="unassignedROList">
+            <div class="empty">Loading...</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Current RO Assignments</h2>
+        <div class="table-wrapper">
+            <table>
+                <thead><tr><th>RO #</th><th>Technician</th><th>Actions</th></tr></thead>
+                <tbody id="assignmentsTable"><tr><td colspan="3" class="empty">Loading...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- ===================================================== -->
+<!-- TECH LOOKUP -->
+<!-- ===================================================== -->
+
+<section id="techLookupPage" class="page">
+    <div class="card">
+        <h2>Technician Parts</h2>
+        <p style="color:#6b7280;">Tap your name to see your assigned repair orders.</p>
+        <div id="deviceTechPanel" style="display:none; margin-bottom:18px; padding:16px; background:#f9fafb; border-radius:10px;">
+            <div style="font-weight:bold; font-size:18px;" id="deviceTechName"></div>
+            <div id="notificationStatus" class="tech-lookup-status">Notifications: OFF</div>
+            <div class="button-row" style="margin-top:12px;">
+                <button type="button" class="primary" id="enableNotificationsButton" onclick="enableNotifications()">ENABLE NOTIFICATIONS</button>
+                <button type="button" class="secondary" onclick="changeTechnician()">CHANGE TECHNICIAN</button>
+            </div>
+        </div>
+        <div id="techSelectionPanel">
+            <div class="tech-grid" id="techButtons"></div>
+        </div>
+        <div id="techLookupStatus" class="tech-lookup-status">Choose a technician.</div>
+    </div>
+
+    <div id="techROResults" class="card" style="display:none;">
+        <div class="tech-results-header">
+            <div><h2 id="techROTitle">Repair Orders</h2><div id="techROCount" class="catalog-count"></div></div>
+            <button type="button" class="secondary" onclick="clearTechLookup()">BACK TO TECHS</button>
+        </div>
+        <div id="techROList"></div>
+    </div>
+
+    <div id="techLookupResults" class="card" style="display:none;">
+        <div class="tech-results-header">
+            <div><h2 id="techResultsTitle">Parts for RO</h2><div id="techResultsCount" class="catalog-count"></div></div>
+            <button type="button" class="secondary" onclick="backToTechROs()">BACK TO ROs</button>
+        </div>
+        <div class="table-wrapper">
+            <table>
+                <thead><tr><th>Part Number</th><th>Description</th><th>Qty</th><th>Location</th><th>Received</th></tr></thead>
+                <tbody id="techLookupTable"></tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+</div> <script>
+/* =========================================================
+   SUPABASE
+========================================================= */
+
+const supabaseClient =
+    window.supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_KEY
+    );
+
+let isAdmin = false;
+
+function showAdminLogin() {
+    const form = document.getElementById("adminLoginForm");
+    if (form) form.style.display = form.style.display === "none" ? "block" : "none";
+}
+
+function setAdminLoginStatus(message, type) {
+    const status = document.getElementById("adminLoginStatus");
+    if (!status) return;
+    status.textContent = message || "";
+    status.className = message ? "status " + type : "status";
+}
+
+async function checkAdminAccess() {
+    const { data: sessionData } = await supabaseClient.auth.getSession();
+    const session = sessionData?.session || null;
+
+    if (!session) {
+        isAdmin = false;
+        updateAdminUI(null);
+        return false;
+    }
+
+    const { data, error } = await supabaseClient.rpc("is_app_admin");
+
+    if (error || data !== true) {
+        console.error("Admin check failed:", error);
+        isAdmin = false;
+        await supabaseClient.auth.signOut();
+        updateAdminUI(null);
+        return false;
+    }
+
+    isAdmin = true;
+    updateAdminUI(session.user);
+    return true;
+}
+
+function updateAdminUI(user) {
+    const loggedOut = document.getElementById("adminLoggedOut");
+    const loggedIn = document.getElementById("adminLoggedIn");
+    const sessionStatus = document.getElementById("adminSessionStatus");
+
+    if (loggedOut) loggedOut.style.display = isAdmin ? "none" : "block";
+    if (loggedIn) loggedIn.style.display = isAdmin ? "block" : "none";
+
+    if (sessionStatus && isAdmin) {
+        sessionStatus.textContent = "Admin mode — " + (user?.email || "signed in");
+    }
+
+    const adminNavIds = ["navReceive", "navROAssignments", "navImportHistory"];
+    adminNavIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = isAdmin ? "" : "none";
+    });
+
+    const catalogAdminCard = document.getElementById("catalogAdminCard");
+    if (catalogAdminCard) {
+        catalogAdminCard.style.display = isAdmin ? "" : "none";
+    }
+
+
+    if (!isAdmin) {
+        const activeAdminPage =
+            document.getElementById("receivePage")?.classList.contains("active") ||
+            document.getElementById("roAssignmentsPage")?.classList.contains("active") ||
+            document.getElementById("importHistoryPage")?.classList.contains("active");
+
+        if (activeAdminPage) {
+            const techButton = document.getElementById("navTechLookup");
+            if (techButton) showPage("techLookupPage", techButton);
+        }
+    }
+
+    if (document.getElementById("catalogPage")?.classList.contains("active")) {
+        loadCatalog();
+    }
+}
+
+async function adminLogin() {
+    const email = document.getElementById("adminEmail").value.trim();
+    const password = document.getElementById("adminPassword").value;
+
+    if (!email || !password) {
+        setAdminLoginStatus("Enter your admin email and password.", "error");
+        return;
+    }
+
+    setAdminLoginStatus("Signing in...", "success");
+
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email,
+        password
+    });
+
+    if (error) {
+        console.error("Login error:", error);
+        setAdminLoginStatus("Login failed: " + error.message, "error");
+        return;
+    }
+
+    const { data: adminResult, error: adminError } =
+        await supabaseClient.rpc("is_app_admin");
+
+    if (adminError || adminResult !== true) {
+        console.error("Admin verification failed:", adminError);
+        await supabaseClient.auth.signOut();
+        isAdmin = false;
+        updateAdminUI(null);
+        setAdminLoginStatus("This account is not authorized as an app admin.", "error");
+        return;
+    }
+
+    isAdmin = true;
+    document.getElementById("adminPassword").value = "";
+    setAdminLoginStatus("", "success");
+    updateAdminUI(data.user);
+}
+
+async function adminLogout() {
+    const { error } = await supabaseClient.auth.signOut();
+
+    if (error) {
+        alert("Could not log out: " + error.message);
+        return;
+    }
+
+    isAdmin = false;
+    updateAdminUI(null);
+
+    const techButton = document.getElementById("navTechLookup");
+    if (techButton) showPage("techLookupPage", techButton);
+}
+
+function requireAdmin() {
+    if (isAdmin) return true;
+    alert("Admin login is required to make changes.");
+    return false;
+}
+
+/* =========================================================
+   PAGE NAVIGATION
+========================================================= */
+
+function showPage(pageId, button) {
+
+    document
+        .querySelectorAll(".page")
+        .forEach(page => {
+            page.classList.remove("active");
+        });
+
+    document
+        .getElementById(pageId)
+        .classList.add("active");
+
+    document
+        .querySelectorAll(".nav button")
+        .forEach(navButton => {
+            navButton.classList.remove("active");
+        });
+
+    button.classList.add("active");
+
+    if (pageId === "catalogPage") {
+        loadCatalog();
+    }
+
+    if (pageId === "receivedPage") {
+        loadAllParts();
+    }
+
+    if (pageId === "importHistoryPage") {
+        loadImportHistory();
+    }
+
+
+    if (pageId === "roAssignmentsPage") {
+        loadROAssignments();
+        loadUnassignedROs();
+    }
+
+    if (pageId === "techLookupPage") {
+        renderTechnicianButtons();
+        clearTechLookup();
+    }
+
+}
+
+/* =========================================================
+   REPAIR ORDER ASSIGNMENTS / TECHNICIAN LOOKUP
+========================================================= */
+
+const TECHNICIANS = [
+    "Mike", "Cameron", "Sandro", "Dustin", "Mark",
+    "Anthony", "Josh", "Collin", "Pete", "Brian"
+];
+
+let selectedTechnician = null;
+const VAPID_PUBLIC_KEY = "BL7KER9kCKgdKwy7sFhN3DCjzyC84JIsJ60JHCuI1eopoCIrFkaRHufL2-_XYLRTo1QjPcK_z1eqwceeNT1nmF0";
+const DEVICE_TECH_KEY = "bodyShopPartsTechnician";
+
+function getRememberedTechnician() {
+    const name = localStorage.getItem(DEVICE_TECH_KEY);
+    return TECHNICIANS.includes(name) ? name : null;
+}
+
+function rememberTechnician(name) {
+    localStorage.setItem(DEVICE_TECH_KEY, name);
+    selectedTechnician = name;
+    refreshTechnicianDeviceUI();
+    loadTechnicianROs(name);
+}
+
+function renderTechnicianButtons() {
+    const container = document.getElementById("techButtons");
+    if (!container) return;
+    container.innerHTML = TECHNICIANS.map(name =>
+        `<button type="button" class="tech-button" onclick="rememberTechnician('${escapeJs(name)}')">${escapeHtml(name)}</button>`
+    ).join("");
+    refreshTechnicianDeviceUI();
+}
+
+async function refreshTechnicianDeviceUI() {
+    const remembered = getRememberedTechnician();
+    const devicePanel = document.getElementById("deviceTechPanel");
+    const selectionPanel = document.getElementById("techSelectionPanel");
+    const nameEl = document.getElementById("deviceTechName");
+    const statusEl = document.getElementById("notificationStatus");
+    const enableButton = document.getElementById("enableNotificationsButton");
+    if (!devicePanel || !selectionPanel) return;
+
+    if (!remembered) {
+        devicePanel.style.display = "none";
+        selectionPanel.style.display = "block";
+        return;
+    }
+
+    selectedTechnician = remembered;
+    devicePanel.style.display = "block";
+    selectionPanel.style.display = "none";
+    nameEl.textContent = "This device: " + remembered;
+
+    let subscribed = false;
+    if ("serviceWorker" in navigator && "PushManager" in window && Notification.permission === "granted") {
+        try {
+            const reg = await navigator.serviceWorker.ready;
+            subscribed = !!(await reg.pushManager.getSubscription());
+        } catch (e) { console.error(e); }
+    }
+    statusEl.textContent = subscribed ? "Notifications: ON for " + remembered : "Notifications: OFF";
+    statusEl.className = subscribed ? "tech-lookup-status success" : "tech-lookup-status";
+    enableButton.style.display = subscribed ? "none" : "inline-block";
+}
+
+function urlBase64ToUint8Array(base64String) {
+    const padding = "=".repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = atob(base64);
+    return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+
+async function enableNotifications() {
+    const technician = getRememberedTechnician();
+    if (!technician) { alert("Choose your technician name first."); return; }
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+        alert("Push notifications are not supported on this device/browser.");
+        return;
+    }
+    try {
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") {
+            alert("Notifications were not enabled. You can allow them in your phone settings and try again.");
+            await refreshTechnicianDeviceUI();
+            return;
+        }
+        const registration = await navigator.serviceWorker.ready;
+        let subscription = await registration.pushManager.getSubscription();
+        if (!subscription) {
+            subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+            });
+        }
+        const { data, error } = await supabaseClient.functions.invoke("push-notifications", {
+            body: { action: "register", technician, subscription: subscription.toJSON() }
+        });
+        if (error || data?.error) throw new Error(data?.error || error?.message || "Registration failed");
+        await refreshTechnicianDeviceUI();
+        alert("Notifications enabled for " + technician + "!");
+    } catch (error) {
+        console.error("Notification setup error:", error);
+        alert("Could not enable notifications: " + error.message);
+    }
+}
+
+async function changeTechnician() {
+    if (!confirm("Change technician? Notifications for the current technician will be disabled on this device.")) return;
+    try {
+        if ("serviceWorker" in navigator && "PushManager" in window) {
+            const registration = await navigator.serviceWorker.ready;
+            const subscription = await registration.pushManager.getSubscription();
+            if (subscription) {
+                const endpoint = subscription.endpoint;
+                const { data, error } = await supabaseClient.functions.invoke("push-notifications", {
+                    body: { action: "unregister", endpoint }
+                });
+                if (error || data?.error) throw new Error(data?.error || error?.message || "Could not disable old registration");
+                await subscription.unsubscribe();
+            }
+        }
+        localStorage.removeItem(DEVICE_TECH_KEY);
+        selectedTechnician = null;
+        document.getElementById("techROResults").style.display = "none";
+        document.getElementById("techLookupResults").style.display = "none";
+        refreshTechnicianDeviceUI();
+        const status = document.getElementById("techLookupStatus");
+        status.textContent = "Choose a technician. Notifications are OFF until enabled again.";
+        status.className = "tech-lookup-status";
+    } catch (error) {
+        console.error("Change technician error:", error);
+        alert("Could not disable the current notification registration: " + error.message);
+    }
+}
+
+async function assignRepairOrder() {
+
+    if (!requireAdmin()) return;
+    const roNumber = document.getElementById("assignmentRO").value.trim();
+    const technician = document.getElementById("assignmentTech").value;
+    const status = document.getElementById("assignmentStatus");
+
+    if (!roNumber || !technician) {
+        status.textContent = "Enter an RO number and choose a technician.";
+        status.className = "status error";
+        return;
+    }
+
+    const { error } = await supabaseClient
+        .from("repair_orders")
+        .upsert({ ro_number: roNumber, technician: technician }, { onConflict: "ro_number" });
+
+    if (error) {
+        console.error(error);
+        status.textContent = "Could not save assignment: " + error.message;
+        status.className = "status error";
+        return;
+    }
+
+    status.textContent = "";
+    status.className = "status";
+    document.getElementById("assignmentRO").value = "";
+    document.getElementById("assignmentTech").value = "";
+    await Promise.all([loadROAssignments(), loadUnassignedROs()]);
+}
+
+async function loadUnassignedROs() {
+    const list = document.getElementById("unassignedROList");
+    const count = document.getElementById("unassignedROCount");
+    if (!list || !count || !isAdmin) return;
+
+    list.innerHTML = '<div class="empty">Loading...</div>';
+    count.textContent = "Loading...";
+
+    const { data, error } = await supabaseClient
+        .from("repair_orders")
+        .select("ro_number, vehicle_year, vehicle_make, vehicle_model, automate_last_seen_at")
+        .eq("technician", "Unassigned")
+        .eq("automate_active", true)
+        .order("ro_number", { ascending: false });
+
+    if (error) {
+        console.error("Unassigned RO load failed:", error);
+        count.textContent = "Could not load unassigned ROs";
+        list.innerHTML = '<div class="empty">Could not load ROs with no tech.</div>';
+        return;
+    }
+
+    const rows = data || [];
+    count.textContent = `${rows.length} open RO${rows.length === 1 ? "" : "s"} with no tech`;
+
+    if (!rows.length) {
+        list.innerHTML = '<div class="empty">No Open ROs are waiting for a technician assignment.</div>';
+        return;
+    }
+
+    list.innerHTML = rows.map((ro, index) => {
+        const vehicle = [ro.vehicle_year, ro.vehicle_make, ro.vehicle_model]
+            .map(value => String(value || "").trim())
+            .filter(Boolean)
+            .join(" ");
+        const selectId = `unassignedTech_${index}`;
+        const options = TECHNICIANS.map(name =>
+            `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`
+        ).join("");
+
+        return `
+            <div class="ro-card" style="cursor:default;">
+                <div style="display:flex; gap:14px; justify-content:space-between; align-items:flex-end; flex-wrap:wrap;">
+                    <div style="min-width:190px; flex:1;">
+                        <strong>RO ${escapeHtml(ro.ro_number)}</strong>
+                        ${vehicle ? `<div class="catalog-count" style="font-weight:700; margin-top:4px;">${escapeHtml(vehicle)}</div>` : ""}
+                    </div>
+                    <div style="min-width:210px; flex:1; max-width:320px;">
+                        <label for="${selectId}">Assign Technician</label>
+                        <select id="${selectId}">
+                            <option value="">Choose technician...</option>
+                            ${options}
+                        </select>
+                    </div>
+                    <div>
+                        <button type="button" class="primary" onclick="assignUnassignedRO('${escapeJs(ro.ro_number)}', '${selectId}')">ASSIGN</button>
+                    </div>
+                </div>
+            </div>`;
+    }).join("");
+}
+
+async function assignUnassignedRO(roNumber, selectId) {
+    if (!requireAdmin()) return;
+    const select = document.getElementById(selectId);
+    const technician = select?.value || "";
+    if (!technician) {
+        alert("Choose a technician first.");
+        return;
+    }
+
+    const { error } = await supabaseClient
+        .from("repair_orders")
+        .update({
+            technician,
+            source: "manual",
+            active: true
+        })
+        .eq("ro_number", roNumber)
+        .eq("technician", "Unassigned");
+
+    if (error) {
+        console.error("Unassigned RO assignment failed:", error);
+        alert("Could not assign RO " + roNumber + ": " + error.message);
+        return;
+    }
+
+    await Promise.all([loadUnassignedROs(), loadROAssignments()]);
+}
+
+async function loadROAssignments() {
+    const table = document.getElementById("assignmentsTable");
+    if (!table) return;
+    table.innerHTML = `<tr><td colspan="3" class="empty">Loading...</td></tr>`;
+
+    const { data, error } = await supabaseClient
+        .from("repair_orders")
+        .select("ro_number, technician, job_group, source, active")
+        .eq("automate_active", true)
+        .neq("technician", "Unassigned");
+
+    if (error) {
+        console.error(error);
+        table.innerHTML = `<tr><td colspan="3" class="empty">Could not load RO assignments.</td></tr>`;
+        return;
+    }
+
+    if (!data || data.length === 0) {
+        table.innerHTML = `<tr><td colspan="3" class="empty">No active ROs assigned yet.</td></tr>`;
+        return;
+    }
+
+    const sorted = [...data].sort((a, b) => Number(b.ro_number) - Number(a.ro_number));
+
+    table.innerHTML = sorted.map(ro => `
+        <tr>
+            <td>${escapeHtml(ro.ro_number)}</td>
+            <td>${escapeHtml(ro.technician)}</td>
+            <td><button class="danger" onclick="deleteROAssignment('${escapeJs(ro.ro_number)}')">REMOVE</button></td>
+        </tr>`).join("");
+}
+
+async function deleteROAssignment(roNumber) {
+
+    if (!requireAdmin()) return;
+    if (!confirm(`Remove assignment for RO ${roNumber}?`)) return;
+    const { error } = await supabaseClient.from("repair_orders").delete().eq("ro_number", roNumber);
+    if (error) { alert("Could not remove assignment: " + error.message); return; }
+    await loadROAssignments();
+}
+
+function getROGroupNumbers(jobGroup, fallbackRO) {
+    const raw = String(jobGroup || fallbackRO || "");
+    return [...new Set(
+        raw.split("/")
+            .map(ro => ro.trim())
+            .filter(ro => /^\d+$/.test(ro))
+    )].sort((a, b) => Number(b) - Number(a));
+}
+
+function getROGroupSortValue(jobGroup, fallbackRO) {
+    const numbers = getROGroupNumbers(jobGroup, fallbackRO);
+    return numbers.length ? Math.max(...numbers.map(Number)) : 0;
+}
+
+async function loadTechnicianROs(technician) {
+    selectedTechnician = technician;
+    const status = document.getElementById("techLookupStatus");
+    const card = document.getElementById("techROResults");
+    const list = document.getElementById("techROList");
+    const count = document.getElementById("techROCount");
+
+    status.textContent = `Loading ${technician}'s repair orders...`;
+    status.className = "tech-lookup-status";
+
+    const { data, error } = await supabaseClient
+        .from("repair_orders")
+        .select("ro_number, job_group, vehicle_year, vehicle_make, vehicle_model")
+        .eq("technician", technician)
+        .eq("automate_active", true);
+
+    if (error) {
+        console.error(error);
+        status.textContent = "Could not load repair orders: " + error.message;
+        status.className = "tech-lookup-status error";
+        return;
+    }
+
+    const groups = new Map();
+
+    (data || []).forEach(ro => {
+        const numbers = getROGroupNumbers(ro.job_group, ro.ro_number);
+        const groupKey = numbers.join("/") || String(ro.ro_number || "");
+        if (!groupKey) return;
+
+        const vehicleInfo = [ro.vehicle_year, ro.vehicle_make, ro.vehicle_model]
+            .map(value => String(value || "").trim())
+            .filter(Boolean)
+            .join(" ");
+
+        if (!groups.has(groupKey)) {
+            groups.set(groupKey, {
+                display: groupKey,
+                roNumbers: numbers.length ? numbers : [String(ro.ro_number)],
+                sortValue: getROGroupSortValue(groupKey, ro.ro_number),
+                vehicleInfo
+            });
+        } else if (!groups.get(groupKey).vehicleInfo && vehicleInfo) {
+            groups.get(groupKey).vehicleInfo = vehicleInfo;
+        }
+    });
+
+    const jobs = Array.from(groups.values())
+        .sort((a, b) => b.sortValue - a.sortValue);
+
+    document.getElementById("techROTitle").textContent = technician + " — Repair Orders";
+    count.textContent = `${jobs.length} active job${jobs.length === 1 ? "" : "s"}`;
+
+    list.innerHTML = jobs.length
+        ? jobs.map(job => {
+            const roArg = escapeJs(job.roNumbers.join("/"));
+            const vehicleLine = job.vehicleInfo
+                ? `<div class="catalog-count" style="font-weight:700; margin-top:4px;">${escapeHtml(job.vehicleInfo)}</div>`
+                : "";
+            return `<div class="ro-card" onclick="searchPartsByROGroup('${roArg}')"><strong>RO ${escapeHtml(job.display.replaceAll("/", " / "))}</strong>${vehicleLine}<div class="catalog-count">Tap to view received parts from ${job.roNumbers.length === 1 ? "this RO" : "either RO"}</div></div>`;
+        }).join("")
+        : `<div class="empty">No active repair orders are assigned to ${escapeHtml(technician)}.</div>`;
+
+    card.style.display = "block";
+    document.getElementById("techLookupResults").style.display = "none";
+    status.textContent = "";
+    status.className = "tech-lookup-status";
+}
+
+async function searchPartsByROGroup(roGroup) {
+    const roNumbers = getROGroupNumbers(roGroup, roGroup);
+    const displayRO = roNumbers.join(" / ");
+    const status = document.getElementById("techLookupStatus");
+    const resultsCard = document.getElementById("techLookupResults");
+    const resultsTable = document.getElementById("techLookupTable");
+    const resultsTitle = document.getElementById("techResultsTitle");
+    const resultsCount = document.getElementById("techResultsCount");
+
+    if (!roNumbers.length) {
+        status.textContent = "Could not determine the repair order number.";
+        status.className = "tech-lookup-status error";
+        return;
+    }
+
+    status.textContent = "Checking parts...";
+
+    const { data: receivedParts, error } = await supabaseClient
+        .from("parts")
+        .select("id, ro_number, part_number, quantity, location, received_at")
+        .in("ro_number", roNumbers)
+        .order("received_at", { ascending: false });
+
+    if (error) {
+        console.error(error);
+        status.textContent = "Could not look up parts: " + error.message;
+        status.className = "tech-lookup-status error";
+        return;
+    }
+
+    resultsTitle.textContent = "Parts for RO " + displayRO;
+    const partNumbers = [...new Set((receivedParts || []).map(p => p.part_number).filter(Boolean))];
+    let catalogMap = {};
+
+    if (partNumbers.length) {
+        const { data: catalogParts } = await supabaseClient
+            .from("parts_catalog")
+            .select("part_number, manufacturer, part_name")
+            .in("part_number", partNumbers);
+        (catalogParts || []).forEach(p => catalogMap[p.part_number] = p);
+    }
+
+    if (!receivedParts || !receivedParts.length) {
+        resultsTable.innerHTML = `<tr><td colspan="5" class="empty">No parts have been received for RO ${escapeHtml(displayRO)} yet.</td></tr>`;
+        resultsCount.textContent = "No received parts found";
+    } else {
+        resultsTable.innerHTML = receivedParts.map(part => {
+            const c = catalogMap[part.part_number];
+            const description = c ? `${c.manufacturer} — ${c.part_name}` : "Part not in catalog";
+            const received = part.received_at ? new Date(part.received_at).toLocaleString() : "—";
+            return `<tr><td>${escapeHtml(part.part_number)}</td><td>${escapeHtml(description)}</td><td>${escapeHtml(part.quantity)}</td><td class="tech-location">${escapeHtml(part.location)}</td><td>${escapeHtml(received)}</td></tr>`;
+        }).join("");
+        resultsCount.textContent = `${receivedParts.length} received part${receivedParts.length === 1 ? "" : "s"}${roNumbers.length > 1 ? " across both ROs" : ""}`;
+    }
+
+    document.getElementById("techROResults").style.display = "none";
+    resultsCard.style.display = "block";
+    status.textContent = "";
+    status.className = "tech-lookup-status";
+}
+
+// Keep the original function name available for any older links/calls.
+async function searchPartsByRO(roNumber) {
+    return searchPartsByROGroup(roNumber);
+}
+
+function backToTechROs() {
+    document.getElementById("techLookupResults").style.display = "none";
+    if (selectedTechnician) loadTechnicianROs(selectedTechnician);
+}
+
+function clearTechLookup() {
+    document.getElementById("techROResults").style.display = "none";
+    document.getElementById("techLookupResults").style.display = "none";
+    const remembered = getRememberedTechnician();
+    selectedTechnician = remembered;
+    const status = document.getElementById("techLookupStatus");
+    if (status) {
+        status.textContent = remembered ? "" : "Choose a technician.";
+        status.className = "tech-lookup-status";
+    }
+    refreshTechnicianDeviceUI();
+    if (remembered) loadTechnicianROs(remembered);
+}
+
+/* =========================================================
+   ACTIVE RO
+========================================================= */
+
+async function setActiveRO() {
+
+    const roInput =
+        document.getElementById("roNumber");
+
+    const activeRO =
+        document.getElementById("activeRO");
+
+    const roNumber =
+        roInput.value.trim();
+
+    if (!roNumber) {
+
+        alert(
+            "Please enter a Repair Order number."
+        );
+
+        roInput.focus();
+
+        return;
+    }
+
+    const { data: assignment, error: assignmentError } =
+        await supabaseClient
+            .from("repair_orders")
+            .select("technician")
+            .eq("ro_number", roNumber)
+            .eq("automate_active", true)
+            .maybeSingle();
+
+    if (assignmentError) {
+        alert("Could not check RO assignment:\n\n" + assignmentError.message);
+        return;
+    }
+
+    if (!assignment) {
+        alert("RO " + roNumber + " is not currently Open in Auto/Mate.");
+        return;
+    }
+
+    const technicianLabel =
+        assignment.technician === "Unassigned"
+            ? "Unassigned — parts can still be received"
+            : assignment.technician;
+
+    activeRO.textContent =
+        "Active RO: " + roNumber + " — " + technicianLabel;
+
+    roInput.style.backgroundColor =
+        "#dcfce7";
+
+    roInput.style.fontWeight =
+        "bold";
+
+    document
+        .getElementById("partNumber")
+        .focus();
+}
+
+/* =========================================================
+   LOOK UP PART
+========================================================= */
+
+async function lookupPart() {
+
+    const partNumber =
+        document
+            .getElementById("partNumber")
+            .value
+            .trim();
+
+    const partInfo =
+        document.getElementById("partInfo");
+
+    if (!partNumber) {
+
+        partInfo.textContent =
+            "Part description will appear here";
+
+        return;
+    }
+
+    partInfo.textContent =
+        "Looking up part...";
+
+    const { data, error } =
+        await supabaseClient
+            .from("parts_catalog")
+            .select(
+                "part_number, manufacturer, part_name"
+            )
+            .eq("part_number", partNumber)
+            .maybeSingle();
+
+    if (error) {
+
+        console.error(error);
+
+        partInfo.textContent =
+            "Error looking up part.";
+
+        return;
+    }
+
+    if (!data) {
+
+        partInfo.textContent =
+            "Part not found in catalog.";
+
+        return;
+    }
+
+    partInfo.textContent =
+        `${data.manufacturer} — ${data.part_name}`;
+}
+
+/* =========================================================
+   BARCODE SCANNER
+========================================================= */
+
+let barcodeScanner = null;
+
+async function startBarcodeScanner() {
+
+    const scannerContainer =
+        document.getElementById(
+            "scannerContainer"
+        );
+
+    /*
+     * If a scanner already exists,
+     * completely shut it down first.
+     */
+
+    if (barcodeScanner) {
+
+        try {
+            await barcodeScanner.stop();
+        } catch (error) {
+            console.log(
+                "Scanner already stopped."
+            );
+        }
+
+        try {
+            barcodeScanner.clear();
+        } catch (error) {
+            console.log(
+                "Scanner already cleared."
+            );
+        }
+
+        barcodeScanner = null;
+    }
+
+    scannerContainer.style.display =
+        "block";
+
+    await new Promise(resolve =>
+        setTimeout(resolve, 300)
+    );
+
+    barcodeScanner =
+        new Html5Qrcode("reader");
+
+    try {
+
+        await barcodeScanner.start(
+
+            { facingMode: "environment" },
+
+            {
+                fps: 10,
+
+                qrbox: {
+                    width: 350,
+                    height: 120
+                },
+
+                aspectRatio: 2.5
+            },
+
+            async decodedText => {
+
+                console.log(
+                    "Barcode scanned:",
+                    decodedText
+                );
+
+                const partNumber =
+                    decodedText.trim();
+
+                document
+                    .getElementById("partNumber")
+                    .value =
+                    partNumber;
+
+                /*
+                 * Stop camera immediately.
+                 */
+
+                try {
+
+                    await barcodeScanner.stop();
+
+                    barcodeScanner.clear();
+
+                } catch (error) {
+
+                    console.error(
+                        "Scanner cleanup error:",
+                        error
+                    );
+                }
+
+                barcodeScanner = null;
+
+                scannerContainer.style.display =
+                    "none";
+
+                /*
+                 * Look up part after
+                 * camera is completely stopped.
+                 */
+
+                await lookupPart();
+            },
+
+            errorMessage => {
+
+                /*
+                 * Ignore normal
+                 * scanning errors.
+                 */
+
+            }
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Camera start error:",
+            error
+        );
+
+        scannerContainer.style.display =
+            "none";
+
+        try {
+
+            if (barcodeScanner) {
+
+                await barcodeScanner.stop();
+
+                barcodeScanner.clear();
+
+            }
+
+        } catch (cleanupError) {
+
+            console.error(
+                "Cleanup error:",
+                cleanupError
+            );
+        }
+
+        barcodeScanner = null;
+
+        alert(
+            "The camera could not start.\n\n" +
+            "Try clicking SCAN BARCODE again."
+        );
+    }
+}
+
+/* =========================================================
+   CATALOG BARCODE SCANNER
+========================================================= */
+
+let catalogBarcodeScanner = null;
+
+async function startCatalogBarcodeScanner() {
+
+    if (!requireAdmin()) return;
+
+    const scannerContainer =
+        document.getElementById(
+            "catalogScannerContainer"
+        );
+
+    if (catalogBarcodeScanner) {
+
+        try {
+            await catalogBarcodeScanner.stop();
+        } catch (error) {
+            console.log("Catalog scanner already stopped.");
+        }
+
+        try {
+            catalogBarcodeScanner.clear();
+        } catch (error) {
+            console.log("Catalog scanner already cleared.");
+        }
+
+        catalogBarcodeScanner = null;
+    }
+
+    scannerContainer.style.display = "block";
+
+    await new Promise(resolve =>
+        setTimeout(resolve, 300)
+    );
+
+    catalogBarcodeScanner =
+        new Html5Qrcode("catalogReader");
+
+    try {
+
+        await catalogBarcodeScanner.start(
+
+            { facingMode: "environment" },
+
+            {
+                fps: 10,
+                qrbox: {
+                    width: 350,
+                    height: 120
+                },
+                aspectRatio: 2.5
+            },
+
+            async decodedText => {
+
+                const partNumber =
+                    decodedText.trim();
+
+                document
+                    .getElementById(
+                        "catalogPartNumber"
+                    )
+                    .value = partNumber;
+
+                try {
+                    await catalogBarcodeScanner.stop();
+                    catalogBarcodeScanner.clear();
+                } catch (error) {
+                    console.error(
+                        "Catalog scanner cleanup error:",
+                        error
+                    );
+                }
+
+                catalogBarcodeScanner = null;
+                scannerContainer.style.display = "none";
+
+                document
+                    .getElementById("manufacturer")
+                    .focus();
+
+                showStatus("", "");
+            },
+
+            () => {}
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Catalog camera start error:",
+            error
+        );
+
+        scannerContainer.style.display = "none";
+
+        try {
+            if (catalogBarcodeScanner) {
+                await catalogBarcodeScanner.stop();
+                catalogBarcodeScanner.clear();
+            }
+        } catch (cleanupError) {
+            console.error(
+                "Catalog scanner cleanup error:",
+                cleanupError
+            );
+        }
+
+        catalogBarcodeScanner = null;
+
+        alert(
+            "The camera could not start.\n\n" +
+            "Try clicking SCAN BARCODE again."
+        );
+    }
+}
+
+/* =========================================================
+   RECEIVE PART
+========================================================= */
+
+async function receivePart() {
+
+    if (!requireAdmin()) return;
+
+    const roNumber =
+        document
+            .getElementById("roNumber")
+            .value
+            .trim();
+
+    const partNumber =
+        document
+            .getElementById("partNumber")
+            .value
+            .trim();
+
+    const quantity =
+        document
+            .getElementById("quantity")
+            .value;
+
+    const location =
+        document
+            .getElementById("location")
+            .value
+            .trim();
+
+    if (!roNumber) {
+
+        alert(
+            "Please enter the Repair Order number."
+        );
+
+        return;
+    }
+
+    if (!partNumber) {
+
+        alert(
+            "Please scan or enter the part number."
+        );
+
+        return;
+    }
+
+    if (!location) {
+
+        alert(
+            "Please enter the part location."
+        );
+
+        return;
+    }
+
+    const { data: assignment, error: assignmentError } =
+        await supabaseClient
+            .from("repair_orders")
+            .select("technician")
+            .eq("ro_number", roNumber)
+            .eq("automate_active", true)
+            .maybeSingle();
+
+    if (assignmentError) {
+        alert("Could not check RO assignment:\n\n" + assignmentError.message);
+        return;
+    }
+
+    if (!assignment) {
+        alert("RO " + roNumber + " is not currently Open in Auto/Mate.");
+        return;
+    }
+
+    // Unassigned Open ROs are valid receiving targets. Parts are stored by RO
+    // number, so when the RO is assigned later the existing received parts
+    // automatically appear under that technician with no rescanning required.
+
+    const { data, error } =
+        await supabaseClient
+            .from("parts")
+            .insert([
+                {
+                    ro_number: roNumber,
+                    part_number: partNumber,
+                    quantity: Number(quantity),
+                    location: location
+                }
+            ])
+            .select();
+
+    if (error) {
+
+        console.error(error);
+
+        alert(
+            "There was a problem saving the part:\n\n" +
+            error.message
+        );
+
+        return;
+    }
+
+    /*
+     * Automatically add newly received parts to the catalog.
+     * Existing catalog entries are never overwritten.
+     */
+
+    const { data: existingCatalogPart, error: catalogCheckError } =
+        await supabaseClient
+            .from("parts_catalog")
+            .select("part_number")
+            .eq("part_number", partNumber)
+            .maybeSingle();
+
+    if (catalogCheckError) {
+        console.error("Could not check parts catalog:", catalogCheckError);
+    } else if (!existingCatalogPart) {
+        const { error: catalogInsertError } =
+            await supabaseClient
+                .from("parts_catalog")
+                .insert([
+                    {
+                        part_number: partNumber,
+                        manufacturer: "Not entered",
+                        part_name: "Not entered"
+                    }
+                ]);
+
+        if (catalogInsertError) {
+            console.error("Could not automatically add part to catalog:", catalogInsertError);
+        }
+    }
+
+    await addPartToScreen(data[0]);
+
+    /*
+     * Make absolutely sure
+     * the camera is stopped.
+     */
+
+    if (barcodeScanner) {
+
+        try {
+
+            await barcodeScanner.stop();
+
+            barcodeScanner.clear();
+
+        } catch (error) {
+
+            console.error(
+                "Camera cleanup:",
+                error
+            );
+        }
+
+        barcodeScanner = null;
+
+        document
+            .getElementById(
+                "scannerContainer"
+            )
+            .style.display = "none";
+    }
+
+    /*
+     * Clear only the part information.
+     * The active RO stays.
+     */
+
+    document
+        .getElementById("partNumber")
+        .value = "";
+
+    document
+        .getElementById("partInfo")
+        .textContent =
+        "Part description will appear here";
+
+    document
+        .getElementById("partNumber")
+        .focus();
+
+    // Successful receives update the screen silently.
+}
+
+/* =========================================================
+   ADD PART TO RECENT TABLE
+========================================================= */
+
+async function addPartToScreen(part) {
+
+    const table =
+        document.getElementById(
+            "partsTable"
+        );
+
+    const emptyRow =
+        table.querySelector(".empty");
+
+    if (emptyRow) {
+        emptyRow.parentElement.remove();
+    }
+
+    const { data: catalogPart, error } =
+        await supabaseClient
+            .from("parts_catalog")
+            .select(
+                "manufacturer, part_name"
+            )
+            .eq(
+                "part_number",
+                part.part_number
+            )
+            .maybeSingle();
+
+    if (error) {
+        console.error(
+            "Catalog lookup error:",
+            error
+        );
+    }
+
+    let description =
+        "Unknown part";
+
+    if (catalogPart) {
+
+        description =
+            `${catalogPart.manufacturer} — ${catalogPart.part_name}`;
+    }
+
+    const date =
+        new Date(part.received_at);
+
+    const time =
+        date.toLocaleTimeString(
+            [],
+            {
+                hour: "2-digit",
+                minute: "2-digit"
+            }
+        );
+
+    const row =
+        document.createElement("tr");
+
+    row.innerHTML = `
+
+        <td>
+            ${escapeHtml(part.ro_number)}
+        </td>
+
+        <td>
+            ${escapeHtml(part.part_number)}
+        </td>
+
+        <td>
+            ${escapeHtml(description)}
+        </td>
+
+        <td>
+            ${escapeHtml(part.quantity)}
+        </td>
+
+        <td>
+            ${escapeHtml(part.location)}
+        </td>
+
+        <td>
+            ${escapeHtml(time)}
+        </td>
+
+    `;
+
+    table.prepend(row);
+}
+
+/* =========================================================
+   LOAD RECENT PARTS
+========================================================= */
+
+async function loadRecentParts() {
+
+    const { data, error } =
+        await supabaseClient
+            .from("parts")
+            .select("*")
+            .order(
+                "received_at",
+                {
+                    ascending: false
+                }
+            )
+            .limit(25);
+
+    if (error) {
+
+        console.error(
+            "Error loading parts:",
+            error
+        );
+
+        return;
+    }
+
+    const table =
+        document.getElementById(
+            "partsTable"
+        );
+
+    table.innerHTML = "";
+
+    if (!data || data.length === 0) {
+
+        table.innerHTML = `
+
+            <tr>
+
+                <td
+                    colspan="6"
+                    class="empty"
+                >
+                    No parts received yet.
+                </td>
+
+            </tr>
+
+        `;
+
+        return;
+    }
+
+    for (const part of data) {
+
+        await addPartToScreen(part);
+
+    }
+}
+
+/* =========================================================
+   LOAD ALL RECEIVED PARTS
+========================================================= */
+
+async function loadAllParts() {
+
+    const table =
+        document.getElementById(
+            "allPartsTable"
+        );
+
+    table.innerHTML = `
+
+        <tr>
+
+            <td
+                colspan="7"
+                class="empty"
+            >
+                Loading...
+            </td>
+
+        </tr>
+
+    `;
+
+    const { data, error } =
+        await supabaseClient
+            .from("parts")
+            .select("*")
+            .order(
+                "received_at",
+                {
+                    ascending: false
+                }
+            );
+
+    if (error) {
+
+        console.error(error);
+
+        table.innerHTML = `
+
+            <tr>
+
+                <td
+                    colspan="7"
+                    class="empty"
+                >
+                    Error loading received parts.
+                </td>
+
+            </tr>
+
+        `;
+
+        return;
+    }
+
+    table.innerHTML = "";
+
+    if (!data || data.length === 0) {
+
+        table.innerHTML = `
+
+            <tr>
+
+                <td
+                    colspan="7"
+                    class="empty"
+                >
+                    No parts received yet.
+                </td>
+
+            </tr>
+
+        `;
+
+        return;
+    }
+
+    for (const part of data) {
+
+        const { data: catalogPart } =
+            await supabaseClient
+                .from("parts_catalog")
+                .select(
+                    "manufacturer, part_name"
+                )
+                .eq(
+                    "part_number",
+                    part.part_number
+                )
+                .maybeSingle();
+
+        let description =
+            "Unknown part";
+
+        if (catalogPart) {
+
+            description =
+                `${catalogPart.manufacturer} — ${catalogPart.part_name}`;
+        }
+
+        const date =
+            new Date(part.received_at);
+
+        const received =
+            date.toLocaleString(
+                [],
+                {
+                    dateStyle: "short",
+                    timeStyle: "short"
+                }
+            );
+
+        const row =
+            document.createElement("tr");
+
+        row.innerHTML = `
+
+            <td>
+                ${escapeHtml(part.ro_number)}
+            </td>
+
+            <td>
+                ${escapeHtml(part.part_number)}
+            </td>
+
+            <td>
+                ${escapeHtml(description)}
+            </td>
+
+            <td>
+                ${escapeHtml(part.quantity)}
+            </td>
+
+            <td>
+                ${escapeHtml(part.location)}
+            </td>
+
+            <td>
+                ${escapeHtml(received)}
+            </td>
+
+            <td>
+                ${isAdmin ? `
+                    <button
+                        type="button"
+                        class="danger"
+                        onclick="deleteReceivedPart('${part.id}', '${escapeJs(String(part.ro_number ?? ""))}', '${escapeJs(String(part.part_number ?? ""))}')"
+                    >
+                        DELETE
+                    </button>
+                ` : `<span style="color:#6b7280;">View only</span>`}
+            </td>
+
+        `;
+
+        table.appendChild(row);
+    }
+}
+
+
+/* =========================================================
+   DELETE RECEIVED PART
+========================================================= */
+async function deleteReceivedPart(id, roNumber, partNumber) {
+    if (!requireAdmin()) return;
+
+    const label = partNumber
+        ? `part ${partNumber} from RO ${roNumber}`
+        : `this received part from RO ${roNumber}`;
+
+    if (!confirm(`Delete ${label}?\n\nThis will remove the received-part record.`)) return;
+
+    const { error } = await supabaseClient
+        .from("parts")
+        .delete()
+        .eq("id", id);
+
+    if (error) {
+        console.error("Delete received part error:", error);
+        alert("Could not delete the received part: " + error.message);
+        return;
+    }
+
+    await loadAllParts();
+    await loadRecentParts();
+    // Successful deletes refresh the list silently.
+}
+
+/* =========================================================
+   CATALOG
+========================================================= */
+
+let editingPartNumber = null;
+
+function showStatus(message, type) {
+
+    const status =
+        document.getElementById(
+            "statusMessage"
+        );
+
+    status.textContent =
+        message;
+
+    status.className =
+        "status " + type;
+
+    setTimeout(() => {
+
+        status.className =
+            "status";
+
+    }, 4000);
+}
+
+/* =========================================================
+   AUTO/MATE PARTS LIST PDF IMPORT
+========================================================= */
+
+let previewedPartsImport = null;
+
+function setPartsImportPreview(message, type = "") {
+    const box = document.getElementById("partsImportPreview");
+    if (!box) return;
+    box.textContent = message;
+    box.className = "status" + (type ? " " + type : "");
+}
+
+function clearPartsImport() {
+    previewedPartsImport = null;
+    const input = document.getElementById("partsListPdf");
+    const button = document.getElementById("importPartsButton");
+    if (input) input.value = "";
+    if (button) button.disabled = true;
+    setPartsImportPreview("", "");
+}
+
+function normalizeImportedPartNumber(value) {
+    return String(value || "").trim().toUpperCase().replace(/\s+/g, "");
+}
+
+function parseAutoMateTextLine(line) {
+    // Auto/Mate Part Preview rows look like:
+    // A 52119AK901 COVER, FR BUMP C 1 $147.99 $225.37 $225.37
+    const match = String(line || "").match(
+        /^\s*[A-Z]\s+([A-Z0-9-]{7,})\s+(.+?)\s+[A-Z]\s+(\d+)\s+\$[\d,.]+(?:\s+\$[\d,.]+){1,2}/i
+    );
+
+    if (!match) return null;
+
+    const partNumber = normalizeImportedPartNumber(match[1]);
+    const description = String(match[2] || "").replace(/\s+/g, " ").trim();
+    const quantity = Number(match[3]);
+
+    if (!partNumber || !description || !Number.isFinite(quantity) || quantity < 1) {
+        return null;
+    }
+
+    return {
+        part_number: partNumber,
+        part_name: description,
+        quantity: quantity
+    };
+}
+
+function groupPdfItemsIntoLines(items) {
+    const rows = [];
+
+    for (const item of items || []) {
+        const text = String(item.str || "").trim();
+        if (!text) continue;
+
+        const x = item.transform?.[4] || 0;
+        const y = item.transform?.[5] || 0;
+        let row = rows.find(existing => Math.abs(existing.y - y) <= 2);
+
+        if (!row) {
+            row = { y, items: [] };
+            rows.push(row);
+        }
+
+        row.items.push({ x, text });
+    }
+
+    rows.sort((a, b) => b.y - a.y);
+
+    return rows.map(row =>
+        row.items
+            .sort((a, b) => a.x - b.x)
+            .map(item => item.text)
+            .join(" ")
+            .replace(/\s+/g, " ")
+            .trim()
+    );
+}
+
+async function previewPartsListPdf(file) {
+    if (!requireAdmin()) {
+        clearPartsImport();
+        return;
+    }
+
+    previewedPartsImport = null;
+    const importButton = document.getElementById("importPartsButton");
+    if (importButton) importButton.disabled = true;
+
+    if (!file) {
+        setPartsImportPreview("Choose an Auto/Mate Part Preview PDF.", "error");
+        return;
+    }
+
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+        setPartsImportPreview("Please choose a PDF file.", "error");
+        return;
+    }
+
+    if (!window.pdfjsLib) {
+        setPartsImportPreview("The PDF reader did not load. Check the internet connection and reload the app.", "error");
+        return;
+    }
+
+    setPartsImportPreview("Reading parts list...", "");
+
+    try {
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+
+        let roNumber = "";
+        const importedMap = new Map();
+
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+            const page = await pdf.getPage(pageNumber);
+            const textContent = await page.getTextContent();
+            const lines = groupPdfItemsIntoLines(textContent.items);
+
+            for (const line of lines) {
+                if (!roNumber) {
+                    const roMatch = line.match(/Part\s+Preview\s+RO\s*#?\s*([A-Z0-9-]+)/i);
+                    if (roMatch) roNumber = String(roMatch[1]).trim();
+                }
+
+                const parsed = parseAutoMateTextLine(line);
+                if (!parsed) continue;
+
+                const existing = importedMap.get(parsed.part_number);
+                if (existing) {
+                    existing.quantity += parsed.quantity;
+                    if ((!existing.part_name || existing.part_name === "Not entered") && parsed.part_name) {
+                        existing.part_name = parsed.part_name;
+                    }
+                } else {
+                    importedMap.set(parsed.part_number, parsed);
+                }
+            }
+        }
+
+        const parts = Array.from(importedMap.values());
+        const totalPieces = parts.reduce((sum, part) => sum + part.quantity, 0);
+
+        if (!roNumber) {
+            setPartsImportPreview("I could not find the RO number in this PDF. Make sure it is an Auto/Mate Part Preview report.", "error");
+            return;
+        }
+
+        if (!parts.length) {
+            setPartsImportPreview("I found RO " + roNumber + " but could not read any parts from the report.", "error");
+            return;
+        }
+
+        previewedPartsImport = {
+            ro_number: roNumber,
+            parts: parts,
+            total_pieces: totalPieces,
+            file_name: file.name
+        };
+
+        setPartsImportPreview(
+            `RO ${roNumber} — found ${parts.length} unique part number${parts.length === 1 ? "" : "s"}, ${totalPieces} total piece${totalPieces === 1 ? "" : "s"}. Ready to import.`,
+            "success"
+        );
+
+        if (importButton) importButton.disabled = false;
+    } catch (error) {
+        console.error("Could not read parts PDF:", error);
+        setPartsImportPreview("Could not read this PDF. " + (error.message || "Unknown PDF error."), "error");
+    }
+}
+
+async function importPreviewedParts() {
+    if (!requireAdmin()) return;
+
+    if (!previewedPartsImport || !previewedPartsImport.parts.length) {
+        setPartsImportPreview("Choose and preview a parts list first.", "error");
+        return;
+    }
+
+    const button = document.getElementById("importPartsButton");
+    if (button) button.disabled = true;
+
+    const parts = previewedPartsImport.parts;
+    const partNumbers = parts.map(part => part.part_number);
+
+    setPartsImportPreview("Importing parts to catalog...", "");
+
+    try {
+        const { data: existingParts, error: existingError } = await supabaseClient
+            .from("parts_catalog")
+            .select("part_number, manufacturer, part_name")
+            .in("part_number", partNumbers);
+
+        if (existingError) throw existingError;
+
+        const existingMap = new Map(
+            (existingParts || []).map(part => [normalizeImportedPartNumber(part.part_number), part])
+        );
+
+        const newParts = [];
+        const placeholderUpdates = [];
+        let keptExisting = 0;
+
+        for (const part of parts) {
+            const existing = existingMap.get(part.part_number);
+
+            if (!existing) {
+                newParts.push({
+                    part_number: part.part_number,
+                    manufacturer: "Not entered",
+                    part_name: part.part_name
+                });
+                continue;
+            }
+
+            const currentName = String(existing.part_name || "").trim();
+            const currentManufacturer = String(existing.manufacturer || "").trim();
+            const nameNeedsUpdate = !currentName || currentName.toLowerCase() === "not entered";
+            const manufacturerNeedsPlaceholder = !currentManufacturer;
+
+            if (nameNeedsUpdate || manufacturerNeedsPlaceholder) {
+                placeholderUpdates.push({
+                    part_number: existing.part_number,
+                    manufacturer: manufacturerNeedsPlaceholder ? "Not entered" : currentManufacturer,
+                    part_name: nameNeedsUpdate ? part.part_name : currentName
+                });
+            } else {
+                keptExisting++;
+            }
+        }
+
+        if (newParts.length) {
+            const { error: insertError } = await supabaseClient
+                .from("parts_catalog")
+                .insert(newParts);
+            if (insertError) throw insertError;
+        }
+
+        for (const update of placeholderUpdates) {
+            const { error: updateError } = await supabaseClient
+                .from("parts_catalog")
+                .update({
+                    manufacturer: update.manufacturer,
+                    part_name: update.part_name
+                })
+                .eq("part_number", update.part_number);
+            if (updateError) throw updateError;
+        }
+
+        const { error: historyError } = await supabaseClient
+            .from("parts_import_history")
+            .insert({
+                ro_number: previewedPartsImport.ro_number,
+                part_count: parts.length
+            });
+        if (historyError) throw historyError;
+
+        await loadCatalog();
+
+        setPartsImportPreview(
+            `RO ${previewedPartsImport.ro_number} imported: ${newParts.length} new, ${placeholderUpdates.length} filled in, ${keptExisting} already in catalog. You can now scan the physical parts normally.`,
+            "success"
+        );
+    } catch (error) {
+        console.error("Parts list import failed:", error);
+        setPartsImportPreview("Import failed: " + (error.message || "Unknown error."), "error");
+        if (button) button.disabled = false;
+    }
+}
+
+let previewedROList = null;
+
+function setROSyncPreview(message, type = "") {
+    const el = document.getElementById("roSyncPreview");
+    if (!el) return;
+    el.textContent = message || "";
+    el.className = "status" + (type ? " " + type : "");
+}
+
+function clearROListSync(clearFile = true) {
+    previewedROList = null;
+    const input = document.getElementById("roListPdf");
+    if (input && clearFile) input.value = "";
+    const button = document.getElementById("syncROListButton");
+    if (button) button.disabled = true;
+    setROSyncPreview("");
+}
+
+
+function parseAutoMateROListLine(line) {
+    const text = String(line || "").replace(/\s+/g, " ").trim();
+    const roMatch = text.match(/^(\d+)\s+/);
+    if (!roMatch) return null;
+    const statusMatch = text.match(/\b(Open|Invoiced|Void)\b/i);
+    if (!statusMatch) return null;
+    return {
+        ro_number: roMatch[1],
+        status: statusMatch[1].toLowerCase(),
+        vehicle_year: "",
+        vehicle_make: "",
+        vehicle_model: ""
+    };
+}
+
+function normalizePdfItem(item) {
+    return {
+        text: String(item?.str || "").replace(/\s+/g, " ").trim(),
+        x: Number(item?.transform?.[4] || 0),
+        y: Number(item?.transform?.[5] || 0)
+    };
+}
+
+function extractAutoMateRORowsFromPage(items) {
+    const parsed = new Map();
+    const usable = (items || []).filter(item => item.text);
+
+    // Keep the simple full-line fallback for PDFs where Auto/Mate exposes an
+    // entire printed row as one text item. The coordinate parser below will
+    // overwrite these entries with vehicle information when the table columns
+    // are available.
+    for (const item of usable) {
+        const direct = parseAutoMateROListLine(item.text);
+        if (direct) parsed.set(direct.ro_number, direct);
+    }
+
+    const findHeader = label => usable.find(item =>
+        item.text.toLowerCase() === String(label).toLowerCase()
+    );
+
+    const roHeader = findHeader("RO#");
+    const statusHeader = findHeader("Status");
+    const yearHeader = findHeader("Yr");
+    const makeHeader = findHeader("Make");
+    const modelHeader = findHeader("Model");
+    const plateHeader = findHeader("Plate");
+
+    if (roHeader && statusHeader) {
+        // Auto/Mate generates this report internally rotated. Detect whether
+        // table columns run along PDF Y instead of PDF X, then use one generic
+        // row/column system for either orientation.
+        const headersShareX =
+            Math.abs(roHeader.x - statusHeader.x) <
+            Math.abs(roHeader.y - statusHeader.y);
+
+        const rowCoord = item => headersShareX ? item.x : item.y;
+        const columnCoord = item => headersShareX ? item.y : item.x;
+        const roColumn = columnCoord(roHeader);
+
+        // Build exact bands for the vehicle columns from the printed headers.
+        // The midpoint between neighboring headers keeps Make/Model text from
+        // leaking into Year, Plate, Stock#, or Advisor fields.
+        const vehicleHeaders = [
+            ["status", statusHeader],
+            ["year", yearHeader],
+            ["make", makeHeader],
+            ["model", modelHeader],
+            ["plate", plateHeader]
+        ].filter(([, header]) => header);
+
+        const sortedColumns = vehicleHeaders
+            .map(([name, header]) => ({ name, pos: columnCoord(header) }))
+            .sort((a, b) => a.pos - b.pos);
+
+        const bands = new Map();
+        sortedColumns.forEach((column, index) => {
+            const previous = sortedColumns[index - 1];
+            const next = sortedColumns[index + 1];
+            const low = previous ? (previous.pos + column.pos) / 2 : -Infinity;
+            const high = next ? (column.pos + next.pos) / 2 : Infinity;
+            bands.set(column.name, { low, high });
+        });
+
+        const readField = (rowItems, field) => {
+            const band = bands.get(field);
+            if (!band) return "";
+            const values = rowItems
+                .filter(item => {
+                    const coord = columnCoord(item);
+                    return coord >= band.low && coord < band.high;
+                })
+                .sort((a, b) => headersShareX
+                    ? columnCoord(b) - columnCoord(a)
+                    : columnCoord(a) - columnCoord(b))
+                .map(item => item.text)
+                .filter(Boolean);
+            return values.join(" ").replace(/\s+/g, " ").trim();
+        };
+
+        const statusItems = usable.filter(item =>
+            /^(Open|Invoiced|Void)$/i.test(item.text)
+        );
+
+        for (const statusItem of statusItems) {
+            const status = statusItem.text.toLowerCase();
+            const statusRow = rowCoord(statusItem);
+            const rowItems = usable.filter(item =>
+                Math.abs(rowCoord(item) - statusRow) <= 5
+            );
+
+            const candidates = rowItems
+                .filter(item =>
+                    item !== statusItem &&
+                    /^\d+$/.test(item.text)
+                )
+                .sort((a, b) =>
+                    Math.abs(columnCoord(a) - roColumn) -
+                    Math.abs(columnCoord(b) - roColumn)
+                );
+
+            if (!candidates.length) continue;
+
+            const roNumber = candidates[0].text;
+            let vehicleYear = readField(rowItems, "year");
+            const vehicleMake = readField(rowItems, "make");
+            const vehicleModel = readField(rowItems, "model");
+
+            // Year should only be a four-digit vehicle model year. If another
+            // number ever falls into that band, don't show bad information.
+            if (!/^(19|20)\d{2}$/.test(vehicleYear)) vehicleYear = "";
+
+            parsed.set(roNumber, {
+                ro_number: roNumber,
+                status,
+                vehicle_year: vehicleYear,
+                vehicle_make: vehicleMake,
+                vehicle_model: vehicleModel
+            });
+        }
+    }
+
+    return Array.from(parsed.values());
+}
+async function previewROListPdf(file) {
+    if (!requireAdmin()) { clearROListSync(); return; }
+
+    previewedROList = null;
+    const button = document.getElementById("syncROListButton");
+    if (button) button.disabled = true;
+
+    if (!file) {
+        setROSyncPreview("Choose an Auto/Mate Repair Order List PDF.", "error");
+        return;
+    }
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+        setROSyncPreview("Please choose a PDF file.", "error");
+        return;
+    }
+    if (!window.pdfjsLib) {
+        setROSyncPreview("The PDF reader did not load. Check the internet connection and reload the app.", "error");
+        return;
+    }
+
+    setROSyncPreview("Reading every page of the Auto/Mate Repair Order List...");
+
+    try {
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+
+        const roMap = new Map();
+        let recognizedReport = false;
+        let reportedTotal = null;
+
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+            const page = await pdf.getPage(pageNumber);
+            const textContent = await page.getTextContent();
+            const items = (textContent.items || [])
+                .map(normalizePdfItem)
+                .filter(item => item.text);
+
+            const pageText = items
+                .map(item => item.text)
+                .join(" ")
+                .replace(/\s+/g, " ");
+
+            if (/Repair\s+Order\s+List/i.test(pageText)) {
+                recognizedReport = true;
+            }
+
+            const totalMatch = pageText.match(
+                /TOTAL\s+NUMBER\s+OF\s+REPAIR\s+ORDERS\s*=\s*(\d+)/i
+            );
+            if (totalMatch) {
+                reportedTotal = Number(totalMatch[1]);
+            }
+
+            const pageRows = extractAutoMateRORowsFromPage(items);
+            for (const row of pageRows) {
+                roMap.set(row.ro_number, row);
+            }
+        }
+
+        if (!recognizedReport) {
+            setROSyncPreview(
+                "This does not look like the Auto/Mate Repair Order List report.",
+                "error"
+            );
+            return;
+        }
+
+        const rows = Array.from(roMap.values());
+
+        if (!rows.length) {
+            setROSyncPreview(
+                "I found the Repair Order List header but could not read any RO rows.",
+                "error"
+            );
+            return;
+        }
+
+        if (reportedTotal !== null && rows.length !== reportedTotal) {
+            setROSyncPreview(
+                `Stopped for safety: Auto/Mate says this report has ${reportedTotal} ROs, but the app read ${rows.length}. Nothing was updated.`,
+                "error"
+            );
+            return;
+        }
+
+        const open = rows.filter(row => row.status === "open");
+        const inactive = rows.length - open.length;
+
+        const withVehicleInfo = rows.filter(row =>
+            row.vehicle_year || row.vehicle_make || row.vehicle_model
+        ).length;
+
+        previewedROList = {
+            rows,
+            open_ros: open.map(row => row.ro_number),
+            file_name: file.name,
+            page_count: pdf.numPages,
+            reported_total: reportedTotal
+        };
+
+        setROSyncPreview(
+            `Found ${rows.length} ROs across ${pdf.numPages} pages: ${open.length} Open and ${inactive} Invoiced/Void. Vehicle info read for ${withVehicleInfo}. Ready to update the app.`,
+            "success"
+        );
+        if (button) button.disabled = false;
+    } catch (error) {
+        console.error("RO list PDF read failed:", error);
+        setROSyncPreview(
+            "Could not read this PDF. " + (error?.message || "Unknown PDF error."),
+            "error"
+        );
+    }
+}
+
+async function syncPreviewedROList() {
+    if (!requireAdmin()) return;
+    if (!previewedROList || !previewedROList.rows.length) {
+        setROSyncPreview("Choose and preview the current Repair Order List first.", "error");
+        return;
+    }
+    if (!confirm(`Update active ROs from this Auto/Mate report?\n\n${previewedROList.open_ros.length} Open ROs will be treated as active.`)) return;
+
+    const button = document.getElementById("syncROListButton");
+    if (button) button.disabled = true;
+    setROSyncPreview("Updating active ROs from Auto/Mate...");
+
+    try {
+        const now = new Date().toISOString();
+        const { error: clearError } = await supabaseClient
+            .from("repair_orders")
+            .update({ automate_active: false })
+            .neq("ro_number", "");
+        if (clearError) throw clearError;
+
+        let matchedOpen = 0;
+        let createdUnassigned = 0;
+        const rows = previewedROList.rows;
+
+        // Update ROs already known from the Collision Tracker/manual assignments.
+        // If Auto/Mate says an RO is Open but no row exists yet, create a
+        // temporary Unassigned row so it never disappears silently.
+        for (let i = 0; i < rows.length; i += 12) {
+            const chunk = rows.slice(i, i + 12);
+            const results = await Promise.all(chunk.map(async row => {
+                const isOpen = row.status === "open";
+                const vehicleUpdate = {
+                    automate_active: isOpen,
+                    automate_last_seen_at: now,
+                    vehicle_year: row.vehicle_year || null,
+                    vehicle_make: row.vehicle_make || null,
+                    vehicle_model: row.vehicle_model || null
+                };
+
+                const { data, error } = await supabaseClient
+                    .from("repair_orders")
+                    .update(vehicleUpdate)
+                    .eq("ro_number", row.ro_number)
+                    .select("ro_number, technician");
+                if (error) throw error;
+
+                if ((data || []).length > 0) {
+                    return { matched: true, createdUnassigned: false, isOpen };
+                }
+
+                if (!isOpen) {
+                    return { matched: false, createdUnassigned: false, isOpen };
+                }
+
+                const { error: insertError } = await supabaseClient
+                    .from("repair_orders")
+                    .insert({
+                        ro_number: row.ro_number,
+                        technician: "Unassigned",
+                        job_group: row.ro_number,
+                        source: "automate_unassigned",
+                        active: true,
+                        automate_active: true,
+                        automate_last_seen_at: now,
+                        vehicle_year: row.vehicle_year || null,
+                        vehicle_make: row.vehicle_make || null,
+                        vehicle_model: row.vehicle_model || null
+                    });
+                if (insertError) throw insertError;
+
+                return { matched: false, createdUnassigned: true, isOpen };
+            }));
+
+            matchedOpen += results.filter(result => result.matched && result.isOpen).length;
+            createdUnassigned += results.filter(result => result.createdUnassigned).length;
+        }
+
+        setROSyncPreview(
+            `RO sync complete: ${matchedOpen} assigned Open RO${matchedOpen === 1 ? "" : "s"} active with vehicle info.` +
+            (createdUnassigned ? ` ${createdUnassigned} Open RO${createdUnassigned === 1 ? " has" : "s have"} no tech and ${createdUnassigned === 1 ? "was" : "were"} added to ROs With No Tech.` : ""),
+            "success"
+        );
+        await Promise.all([loadROAssignments(), loadUnassignedROs()]);
+    } catch (error) {
+        console.error("RO sync failed:", error);
+        setROSyncPreview("RO sync failed: " + (error.message || "Unknown error."), "error");
+        if (button) button.disabled = false;
+    }
+}
+
+async function loadImportHistory() {
+    if (!isAdmin) return;
+    const tbody = document.getElementById("importHistoryTable");
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="3" class="empty">Loading import history...</td></tr>';
+
+    const { data, error } = await supabaseClient
+        .from("parts_import_history")
+        .select("ro_number, part_count, imported_at")
+        .order("imported_at", { ascending: false });
+
+    if (error) {
+        console.error("Import history load failed:", error);
+        tbody.innerHTML = '<tr><td colspan="3" class="empty">Could not load import history.</td></tr>';
+        return;
+    }
+    if (!data || !data.length) {
+        tbody.innerHTML = '<tr><td colspan="3" class="empty">No PDF imports recorded yet.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = data.map(row => {
+        const when = new Date(row.imported_at).toLocaleString();
+        return `<tr><td><strong>${escapeHtml(row.ro_number)}</strong></td><td>${Number(row.part_count || 0)}</td><td>${escapeHtml(when)}</td></tr>`;
+    }).join("");
+}
+
+/* =========================================================
+   SAVE CATALOG PART
+========================================================= */
+
+async function savePart() {
+
+    if (!requireAdmin()) return;
+
+    const partNumber =
+        document
+            .getElementById(
+                "catalogPartNumber"
+            )
+            .value
+            .trim();
+
+    const manufacturer =
+        document
+            .getElementById(
+                "manufacturer"
+            )
+            .value
+            .trim();
+
+    const partName =
+        document
+            .getElementById(
+                "partName"
+            )
+            .value
+            .trim();
+
+    if (!partNumber) {
+
+        showStatus(
+            "Please enter a part number.",
+            "error"
+        );
+
+        return;
+    }
+
+    if (!manufacturer) {
+
+        showStatus(
+            "Please enter the manufacturer.",
+            "error"
+        );
+
+        return;
+    }
+
+    if (!partName) {
+
+        showStatus(
+            "Please enter the part name or description.",
+            "error"
+        );
+
+        return;
+    }
+
+    /* EDIT */
+
+    if (editingPartNumber) {
+
+        const { error } =
+            await supabaseClient
+                .from("parts_catalog")
+                .update({
+                    part_number: partNumber,
+                    manufacturer: manufacturer,
+                    part_name: partName
+                })
+                .eq(
+                    "part_number",
+                    editingPartNumber
+                );
+
+        if (error) {
+
+            console.error(error);
+
+            showStatus(
+                "Could not update part: " +
+                error.message,
+                "error"
+            );
+
+            return;
+        }
+
+        showStatus("", "");
+
+    }
+
+    /* ADD */
+
+    else {
+
+        const { error } =
+            await supabaseClient
+                .from("parts_catalog")
+                .insert([
+                    {
+                        part_number:
+                            partNumber,
+
+                        manufacturer:
+                            manufacturer,
+
+                        part_name:
+                            partName
+                    }
+                ]);
+
+        if (error) {
+
+            console.error(error);
+
+            showStatus(
+                "Could not add part: " +
+                error.message,
+                "error"
+            );
+
+            return;
+        }
+
+        showStatus("", "");
+    }
+
+    clearCatalogForm();
+
+    await loadCatalog();
+}
+
+/* =========================================================
+   LOAD CATALOG
+========================================================= */
+
+async function loadCatalog() {
+
+    const search =
+        document
+            .getElementById(
+                "searchInput"
+            )
+            .value
+            .trim()
+            .toLowerCase();
+
+    const { data, error } =
+        await supabaseClient
+            .from("parts_catalog")
+            .select(
+                "part_number, manufacturer, part_name"
+            )
+            .order(
+                "part_number",
+                {
+                    ascending: true
+                }
+            );
+
+    const table =
+        document.getElementById(
+            "catalogTable"
+        );
+
+    if (error) {
+
+        console.error(error);
+
+        table.innerHTML = `
+
+            <tr>
+
+                <td
+                    colspan="4"
+                    class="empty"
+                >
+                    Error loading catalog.
+                </td>
+
+            </tr>
+
+        `;
+
+        document
+            .getElementById(
+                "catalogCount"
+            )
+            .textContent =
+            "Error loading catalog.";
+
+        return;
+    }
+
+    let parts =
+        data || [];
+
+    /* SEARCH */
+
+    if (search) {
+
+        parts =
+            parts.filter(part => {
+
+                return (
+
+                    (part.part_number || "")
+                        .toLowerCase()
+                        .includes(search)
+
+                    ||
+
+                    (part.manufacturer || "")
+                        .toLowerCase()
+                        .includes(search)
+
+                    ||
+
+                    (part.part_name || "")
+                        .toLowerCase()
+                        .includes(search)
+
+                );
+
+            });
+    }
+
+    document
+        .getElementById(
+            "catalogCount"
+        )
+        .textContent =
+        `${parts.length} part${parts.length === 1 ? "" : "s"} found`;
+
+    table.innerHTML = "";
+
+    if (parts.length === 0) {
+
+        table.innerHTML = `
+
+            <tr>
+
+                <td
+                    colspan="4"
+                    class="empty"
+                >
+                    No parts found.
+                </td>
+
+            </tr>
+
+        `;
+
+        return;
+    }
+
+    for (const part of parts) {
+
+        const row =
+            document.createElement("tr");
+
+        row.innerHTML = `
+
+            <td>
+                ${escapeHtml(part.part_number)}
+            </td>
+
+            <td>
+                ${escapeHtml(part.manufacturer)}
+            </td>
+
+            <td>
+                ${escapeHtml(part.part_name)}
+            </td>
+
+            <td>
+                ${isAdmin ? `
+                <div class="actions">
+                    <button
+                        class="secondary"
+                        onclick="editPart('${escapeJs(part.part_number)}')"
+                    >
+                        EDIT
+                    </button>
+
+                    <button
+                        class="danger"
+                        onclick="deletePart('${escapeJs(part.part_number)}')"
+                    >
+                        DELETE
+                    </button>
+                </div>
+                ` : `<span style="color:#6b7280;">View only</span>`}
+            </td>
+
+        `;
+
+        table.appendChild(row);
+    }
+}
+
+/* =========================================================
+   EDIT CATALOG PART
+========================================================= */
+
+async function editPart(partNumber) {
+
+    if (!requireAdmin()) return;
+
+    const { data, error } =
+        await supabaseClient
+            .from("parts_catalog")
+            .select(
+                "part_number, manufacturer, part_name"
+            )
+            .eq(
+                "part_number",
+                partNumber
+            )
+            .maybeSingle();
+
+    if (error || !data) {
+
+        showStatus(
+            "Could not load that part.",
+            "error"
+        );
+
+        return;
+    }
+
+    editingPartNumber =
+        data.part_number;
+
+    document
+        .getElementById(
+            "catalogPartNumber"
+        )
+        .value =
+        data.part_number;
+
+    document
+        .getElementById(
+            "manufacturer"
+        )
+        .value =
+        data.manufacturer;
+
+    document
+        .getElementById(
+            "partName"
+        )
+        .value =
+        data.part_name;
+
+    document
+        .getElementById(
+            "formTitle"
+        )
+        .textContent =
+        "Edit Part";
+
+    document
+        .getElementById(
+            "saveButton"
+        )
+        .textContent =
+        "SAVE CHANGES";
+
+    document
+        .getElementById(
+            "cancelButton"
+        )
+        .style.display =
+        "inline-block";
+
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+}
+
+/* =========================================================
+   DELETE CATALOG PART
+========================================================= */
+
+async function deletePart(partNumber) {
+
+    if (!requireAdmin()) return;
+
+    const confirmed =
+        confirm(
+            `Are you sure you want to delete part ${partNumber}?`
+        );
+
+    if (!confirmed) {
+        return;
+    }
+
+    const { error } =
+        await supabaseClient
+            .from("parts_catalog")
+            .delete()
+            .eq(
+                "part_number",
+                partNumber
+            );
+
+    if (error) {
+
+        console.error(error);
+
+        showStatus(
+            "Could not delete part: " +
+            error.message,
+            "error"
+        );
+
+        return;
+    }
+
+    showStatus("", "");
+
+    await loadCatalog();
+}
+
+/* =========================================================
+   CANCEL CATALOG EDIT
+========================================================= */
+
+function cancelEdit() {
+
+    clearCatalogForm();
+}
+
+/* =========================================================
+   CLEAR CATALOG FORM
+========================================================= */
+
+function clearCatalogForm() {
+
+    editingPartNumber = null;
+
+    const catalogScannerContainer =
+        document.getElementById("catalogScannerContainer");
+
+    if (catalogScannerContainer) {
+        catalogScannerContainer.style.display = "none";
+    }
+
+    document
+        .getElementById(
+            "catalogPartNumber"
+        )
+        .value = "";
+
+    document
+        .getElementById(
+            "manufacturer"
+        )
+        .value = "";
+
+    document
+        .getElementById(
+            "partName"
+        )
+        .value = "";
+
+    document
+        .getElementById(
+            "formTitle"
+        )
+        .textContent =
+        "Add Part";
+
+    document
+        .getElementById(
+            "saveButton"
+        )
+        .textContent =
+        "ADD PART";
+
+    document
+        .getElementById(
+            "cancelButton"
+        )
+        .style.display =
+        "none";
+}
+
+/* =========================================================
+   HTML SAFETY
+========================================================= */
+
+function escapeHtml(value) {
+
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function escapeJs(value) {
+
+    return String(value ?? "")
+        .replace(/\\/g, "\\\\")
+        .replace(/'/g, "\\'");
+}
+
+/* =========================================================
+   STARTUP
+========================================================= */
+
+async function startApp() {
+    await checkAdminAccess();
+    await loadRecentParts();
+
+    const { data: listener } = supabaseClient.auth.onAuthStateChange(() => {
+        setTimeout(() => checkAdminAccess(), 0);
+    });
+
+    window.bodyShopAuthListener = listener;
+}
+
+startApp();
+
+</script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js")
+      .catch(error => console.error("Service worker registration failed:", error));
+  });
+}
+</script>
+</body> </html>
