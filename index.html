@@ -1,4 +1,5 @@
-<!DOCTYPE html> <html lang="en"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!DOCTYPE html> <html lang="en">
+<!-- NEW BASELINE 2026-10-26: current live source + batch import, live checklist, manual checks, technician push fixes. --> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lynch Toyota | Body Shop Operations</title>
 
 <!-- Supabase -->
@@ -54,6 +55,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 @media(max-width:580px){.brand-title{font-size:20px}.brand-kicker{font-size:9px}.header-badge:nth-child(1){display:none}.dashboard-grid,.quick-grid{grid-template-columns:1fr 1fr;gap:8px}.metric-card{min-height:96px;padding:13px}.metric-value{font-size:25px}.quick-action{min-height:102px;padding:13px}.verification-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.button-row,.actions{flex-direction:column}.button-row button,.actions button{width:100%}.page-title{font-size:28px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 @media(max-width:900px){.dashboard-lower{grid-template-columns:1fr!important}}
+
+#receiveChecklistTable .manual-badge{display:block;color:#795100;font-weight:800;margin:7px 0;white-space:normal} #receiveChecklistTable button{min-height:44px;margin-top:8px;font-size:12px} #receiveChecklistTable tr.just-scanned{background:var(--green-soft);outline:2px solid var(--green);outline-offset:-2px} #receiveChecklistTable td{overflow-wrap:anywhere} @media(max-width:600px){#receiveChecklistResults table,#receiveChecklistTable,#receiveChecklistTable tr,#receiveChecklistTable td{display:block;width:100%;box-sizing:border-box} #receiveChecklistResults thead{display:none} #receiveChecklistTable tr{padding:10px;border-bottom:2px solid var(--line)} #receiveChecklistTable td{border:0;padding:5px;white-space:normal} #receiveChecklistTable td:before{content:attr(data-label) ": ";font-weight:800} #receiveChecklistTable td:last-child:before{content:""}}
 </style>
 
 <link rel="manifest" href="manifest.webmanifest">
@@ -151,8 +154,19 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 
 <section id="receivePage" class="page">
   <div class="page-hero">
-    <div><div class="page-eyebrow">Parts department</div><h1 class="page-title">Receive Parts</h1><p class="page-copy">Set the repair order once, keep the rack location, then scan continuously. Open unassigned ROs are valid receiving targets.</p></div>
+    <div><div class="page-eyebrow">Parts department</div><h1 class="page-title">Receive Parts</h1><p class="page-copy">Choose an RO and confirm received parts from its imported list. Barcode scanning is optional. Open unassigned ROs can receive parts too.</p></div>
     <div class="receive-session">Session received <strong id="receiveSessionCount">0</strong></div>
+  </div>
+
+  <div class="card" id="receiveChecklistCard">
+    <div class="tech-results-header"><div><h2>Expected Parts for This RO</h2><div class="catalog-count">Import the parts list, then confirm each part you have received. Barcode scanning is optional.</div></div><button type="button" class="secondary" onclick="loadReceiveChecklist()">REFRESH LIST</button></div>
+    <label for="receiveChecklistRO" style="margin-top:12px;display:block;">Repair Order #</label>
+    <input id="receiveChecklistRO" type="text" inputmode="numeric" autocomplete="off" placeholder="Enter RO to load imported parts" oninput="chooseChecklistRO(this.value)">
+    <div id="receiveChecklistStatus" role="status" style="margin-top:12px;">Set an RO to view its expected parts.</div>
+    <div id="receiveChecklistSummary" class="verification-banner incomplete" style="display:none;" aria-live="polite"></div>
+    <div id="receiveChecklistManualStatus" role="status" style="margin-top:10px;"></div>
+    <div id="receiveChecklistFeedback" role="status" style="margin-top:10px;"></div>
+    <div id="receiveChecklistResults" class="table-wrapper" style="display:none;margin-top:14px;"><table><thead><tr><th>Part Number</th><th>Description</th><th>Expected</th><th>Scanned</th><th>Status</th></tr></thead><tbody id="receiveChecklistTable"></tbody></table></div>
   </div>
 
   <div class="receive-grid">
@@ -160,7 +174,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
       <h2>1. Job & Location</h2>
       <div>
         <label for="roNumber">Repair Order #</label>
-        <input type="text" id="roNumber" inputmode="numeric" autocomplete="off" placeholder="Example: 3265" onkeydown="if(event.key==='Enter'){event.preventDefault();setActiveRO();}">
+        <input type="text" id="roNumber" oninput="scheduleReceiveChecklist()" inputmode="numeric" autocomplete="off" placeholder="Example: 3265" onkeydown="if(event.key==='Enter'){event.preventDefault();setActiveRO();}">
         <div id="activeRO" class="active-ro">No active RO</div>
         <button type="button" class="secondary wide" onclick="setActiveRO()" style="margin-top:9px;">SET / VERIFY ACTIVE RO</button>
       </div>
@@ -299,25 +313,26 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
         <div id="catalogImportCard" class="admin-subtool">
         <h2 style="margin-bottom:6px;">Import Auto/Mate Parts List</h2>
         <p style="color:#6b7280; margin-top:0;">
-            Upload an Auto/Mate Part Preview PDF. The app saves it as the expected parts list for that RO and adds missing part numbers to the catalog. Nothing is considered physically here until it is scanned into this app.
+            Upload one or more Auto/Mate Part Preview PDFs. The app saves it as the expected parts list for that RO and adds missing part numbers to the catalog. After import, open the Receive checklist and confirm the parts you have received. Scanning is optional.
         </p>
 
         <div class="form-grid">
             <div class="full">
-                <label for="partsListPdf">Auto/Mate Part Preview PDF</label>
-                <input id="partsListPdf" type="file" accept="application/pdf,.pdf" onchange="previewPartsListPdf(this.files[0])">
+                <label for="partsListPdf">Auto/Mate Part Preview PDFs</label>
+                <input id="partsListPdf" type="file" accept="application/pdf,.pdf" multiple onchange="previewPartsListPdf(this.files)">
             </div>
 
             <div class="full">
                 <div id="partsImportPreview" class="status" aria-live="polite"></div>
+                <div id="partsImportBatch" aria-live="polite"></div>
             </div>
 
             <div class="full">
                 <div class="button-row">
                     <button type="button" class="primary" id="importPartsButton" onclick="importPreviewedParts()" disabled>
-                        IMPORT PARTS TO CATALOG
+                        IMPORT ALL
                     </button>
-                    <button type="button" class="secondary" onclick="clearPartsImport()">
+                    <button type="button" class="secondary" id="clearPartsImportButton" onclick="clearPartsImport()">
                         CLEAR
                     </button>
                 </div>
@@ -1017,6 +1032,7 @@ function showPage(pageId, button) {
     if (pageId === "roAssignmentsPage") Promise.all([loadROAssignments(), loadUnassignedROs()]);
     if (pageId === "vehicleLookupPage") setTimeout(() => document.getElementById("vehicleLookupInput")?.focus(), 0);
     if (pageId === "techLookupPage") { renderTechnicianButtons(); clearTechLookup(); }
+    if (pageId === "receivePage") void loadReceiveChecklist();
     if (pageId === "receivePage") setTimeout(() => document.getElementById("partNumber")?.focus(), 0);
 
     if (window.innerWidth <= 860) window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1228,15 +1244,75 @@ let selectedTechnician = null;
 const VAPID_PUBLIC_KEY = "BL7KER9kCKgdKwy7sFhN3DCjzyC84JIsJ60JHCuI1eopoCIrFkaRHufL2-_XYLRTo1QjPcK_z1eqwceeNT1nmF0";
 const DEVICE_TECH_KEY = "bodyShopPartsTechnician";
 
+const DEVICE_PUSH_KEY = "bodyShopDevicePushBinding";
+let technicianOverride;
+let notificationEpoch = 0;
+let notificationBusy = false;
+let pushCleanupTask = Promise.resolve();
+
 function getRememberedTechnician() {
-    const name = localStorage.getItem(DEVICE_TECH_KEY);
-    return TECHNICIANS.includes(name) ? name : null;
+    if (technicianOverride !== undefined) return technicianOverride;
+    try {
+        const name = localStorage.getItem(DEVICE_TECH_KEY);
+        return TECHNICIANS.includes(name) ? name : null;
+    } catch (error) { return null; }
+}
+
+function readPushBinding() {
+    try { return JSON.parse(localStorage.getItem(DEVICE_PUSH_KEY) || "null"); }
+    catch (error) { return null; }
+}
+
+function clearPushBinding() {
+    try { localStorage.removeItem(DEVICE_PUSH_KEY); } catch (error) { console.error(error); }
+}
+
+function notificationFeedback(message, error = false) {
+    const status = document.getElementById("notificationStatus");
+    status.textContent = message;
+    status.className = "tech-lookup-status" + (error ? " error" : "");
+    alert(message);
+}
+
+function pushDeadline(promise, message) {
+    let timer;
+    return Promise.race([promise, new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), 8000);
+    })]).finally(() => clearTimeout(timer));
+}
+
+async function devicePushRegistration() {
+    if (!("serviceWorker" in navigator)) throw new Error("Service workers are unavailable in this browser.");
+    const registration = await pushDeadline(navigator.serviceWorker.getRegistration(), "Could not find the service worker. Reload and try again.");
+    if (!registration) throw new Error("The app's service worker is missing. Reload the app and try again.");
+    const ready = registration.active ? registration : await pushDeadline(navigator.serviceWorker.ready, "The service worker is not ready. Reload and try again.");
+    if (!ready.pushManager) throw new Error("PushManager is unavailable in this browser.");
+    return ready;
+}
+
+function notificationSupportProblem() {
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const installed = navigator.standalone === true || (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+    if (ios && !installed) return "To enable notifications on iPhone or iPad, Add to Home Screen, then open the app from that icon.";
+    if (!window.isSecureContext) return "Notifications require a secure HTTPS connection.";
+    if (!("Notification" in window)) return "Notifications are unavailable in this browser. Use a browser that supports web push.";
+    if (!("serviceWorker" in navigator)) return "Service workers are unavailable in this browser.";
+    if (!("PushManager" in window)) return "PushManager is unavailable. This browser or installed app does not support web push.";
+    if (Notification.permission === "denied") return "Notifications are blocked. Allow notifications for this app in your browser or device settings, then try again.";
+    return "";
 }
 
 function rememberTechnician(name) {
-    localStorage.setItem(DEVICE_TECH_KEY, name);
+    if (!TECHNICIANS.includes(name)) return;
+    if (getRememberedTechnician() !== name) {
+        notificationEpoch++;
+        clearPushBinding();
+    }
+    technicianOverride = name;
+    try { localStorage.setItem(DEVICE_TECH_KEY, name); }
+    catch (error) { alert("Technician selected for this session. This browser could not remember it."); }
     selectedTechnician = name;
-    refreshTechnicianDeviceUI();
+    void refreshTechnicianDeviceUI();
     loadTechnicianROs(name);
 }
 
@@ -1246,39 +1322,39 @@ function renderTechnicianButtons() {
     container.innerHTML = TECHNICIANS.map(name =>
         `<button type="button" class="tech-button" onclick="rememberTechnician('${escapeJs(name)}')">${escapeHtml(name)}</button>`
     ).join("");
-    refreshTechnicianDeviceUI();
+    void refreshTechnicianDeviceUI();
 }
 
 async function refreshTechnicianDeviceUI() {
+    const epoch = notificationEpoch;
     const remembered = getRememberedTechnician();
     const devicePanel = document.getElementById("deviceTechPanel");
     const selectionPanel = document.getElementById("techSelectionPanel");
-    const nameEl = document.getElementById("deviceTechName");
     const statusEl = document.getElementById("notificationStatus");
     const enableButton = document.getElementById("enableNotificationsButton");
     if (!devicePanel || !selectionPanel) return;
-
-    if (!remembered) {
-        devicePanel.style.display = "none";
-        selectionPanel.style.display = "block";
-        return;
-    }
-
+    devicePanel.style.display = remembered ? "block" : "none";
+    selectionPanel.style.display = remembered ? "none" : "block";
+    statusEl.textContent = "Notifications: OFF";
+    statusEl.className = "tech-lookup-status";
+    enableButton.style.display = "inline-block";
+    if (!remembered) return;
     selectedTechnician = remembered;
-    devicePanel.style.display = "block";
-    selectionPanel.style.display = "none";
-    nameEl.textContent = "This device: " + remembered;
-
-    let subscribed = false;
-    if ("serviceWorker" in navigator && "PushManager" in window && Notification.permission === "granted") {
-        try {
-            const reg = await navigator.serviceWorker.ready;
-            subscribed = !!(await reg.pushManager.getSubscription());
-        } catch (e) { console.error(e); }
-    }
-    statusEl.textContent = subscribed ? "Notifications: ON for " + remembered : "Notifications: OFF";
-    statusEl.className = subscribed ? "tech-lookup-status success" : "tech-lookup-status";
-    enableButton.style.display = subscribed ? "none" : "inline-block";
+    document.getElementById("deviceTechName").textContent = "This device: " + remembered;
+    const binding = readPushBinding();
+    const problem = notificationSupportProblem();
+    if (problem) { statusEl.textContent = "Notifications: OFF — " + problem; return; }
+    if (!binding || binding.technician !== remembered) return;
+    try {
+        const registration = await devicePushRegistration();
+        const subscription = await pushDeadline(registration.pushManager.getSubscription(), "Could not check notification subscription.");
+        if (epoch !== notificationEpoch || remembered !== getRememberedTechnician()) return;
+        if (subscription && subscription.endpoint === binding.endpoint) {
+            statusEl.textContent = "Notifications: ON for " + remembered;
+            statusEl.className = "tech-lookup-status success";
+            enableButton.style.display = "none";
+        } else { clearPushBinding(); }
+    } catch (error) { console.error("Notification state check:", error); }
 }
 
 function urlBase64ToUint8Array(base64String) {
@@ -1288,67 +1364,108 @@ function urlBase64ToUint8Array(base64String) {
     return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
 }
 
-async function enableNotifications() {
-    const technician = getRememberedTechnician();
-    if (!technician) { alert("Choose your technician name first."); return; }
-    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
-        alert("Push notifications are not supported on this device/browser.");
-        return;
+async function cleanupDevicePush(endpoint, suppliedSubscription) {
+    let subscription = suppliedSubscription;
+    let failed = false;
+    if (!subscription) {
+        try {
+            const registration = await devicePushRegistration();
+            subscription = await pushDeadline(registration.pushManager.getSubscription(), "Subscription lookup timed out.");
+        } catch (error) { failed = true; console.error("Push lookup cleanup:", error); }
     }
-    try {
-        const permission = await Notification.requestPermission();
-        if (permission !== "granted") {
-            alert("Notifications were not enabled. You can allow them in your phone settings and try again.");
-            await refreshTechnicianDeviceUI();
-            return;
-        }
-        const registration = await navigator.serviceWorker.ready;
-        let subscription = await registration.pushManager.getSubscription();
-        if (!subscription) {
-            subscription = await registration.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-            });
-        }
-        const { data, error } = await supabaseClient.functions.invoke("push-notifications", {
-            body: { action: "register", technician, subscription: subscription.toJSON() }
-        });
-        if (error || data?.error) throw new Error(data?.error || error?.message || "Registration failed");
-        await refreshTechnicianDeviceUI();
-        alert("Notifications enabled for " + technician + "!");
-    } catch (error) {
-        console.error("Notification setup error:", error);
-        alert("Could not enable notifications: " + error.message);
+    // Browser delivery and server cleanup are independent: neither failure skips the other.
+    if (subscription) {
+        endpoint = subscription.endpoint;
+        try {
+            const removed = await pushDeadline(subscription.unsubscribe(), "Push unsubscribe timed out.");
+            if (!removed) throw new Error("Push unsubscribe was not completed.");
+        } catch (error) { failed = true; console.error("Push unsubscribe cleanup:", error); }
     }
+    if (endpoint) {
+        try {
+            const {data, error} = await pushDeadline(supabaseClient.functions.invoke("push-notifications", {
+                body: {action: "unregister", endpoint}
+            }), "Push server cleanup timed out.");
+            if (error || data?.error) throw new Error(data?.error || error.message);
+        } catch (error) { failed = true; console.error("Push server cleanup:", error); }
+    }
+    return !failed;
 }
 
-async function changeTechnician() {
-    if (!confirm("Change technician? Notifications for the current technician will be disabled on this device.")) return;
+async function enableNotifications() {
+    if (notificationBusy) return;
+    const technician = getRememberedTechnician();
+    if (!technician) { notificationFeedback("Choose your technician name first.", true); return; }
+    const problem = notificationSupportProblem();
+    if (problem) { notificationFeedback(problem, true); return; }
+    const epoch = notificationEpoch;
+    const current = () => epoch === notificationEpoch && technician === getRememberedTechnician();
+    notificationBusy = true;
+    let subscription;
+    let stage = "permission";
     try {
-        if ("serviceWorker" in navigator && "PushManager" in window) {
-            const registration = await navigator.serviceWorker.ready;
-            const subscription = await registration.pushManager.getSubscription();
-            if (subscription) {
-                const endpoint = subscription.endpoint;
-                const { data, error } = await supabaseClient.functions.invoke("push-notifications", {
-                    body: { action: "unregister", endpoint }
-                });
-                if (error || data?.error) throw new Error(data?.error || error?.message || "Could not disable old registration");
-                await subscription.unsubscribe();
-            }
+        // Request permission directly from the user's button gesture (required on iOS).
+        const permission = await Notification.requestPermission();
+        if (!current()) return;
+        if (permission !== "granted") throw new Error(permission === "denied" ? "Notifications are blocked. Allow them in browser or device settings and try again." : "Notification permission was not granted. Tap Enable Notifications and choose Allow.");
+        stage = "service worker";
+        await pushCleanupTask;
+        if (!current()) return;
+        const registration = await devicePushRegistration();
+        if (!current()) return;
+        stage = "subscription";
+        subscription = await pushDeadline(registration.pushManager.getSubscription(), "Could not read the device subscription.");
+        if (!current()) return;
+        if (!subscription) {
+            // Do not race subscribe against a timer: a late success would create an untracked subscription.
+            subscription = await registration.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});
         }
-        localStorage.removeItem(DEVICE_TECH_KEY);
-        selectedTechnician = null;
-        document.getElementById("techROResults").style.display = "none";
-        document.getElementById("techLookupResults").style.display = "none";
-        refreshTechnicianDeviceUI();
-        const status = document.getElementById("techLookupStatus");
-        status.textContent = "Choose a technician. Notifications are OFF until enabled again.";
-        status.className = "tech-lookup-status";
+        if (!current()) { await cleanupDevicePush(subscription.endpoint, subscription); return; }
+        stage = "server registration";
+        clearPushBinding();
+        // Keep registration serialized; compensate if technician changes while it is in flight.
+        const {data, error} = await supabaseClient.functions.invoke("push-notifications", {
+            body: {action: "register", technician, subscription: subscription.toJSON()}
+        });
+        if (!current()) { await cleanupDevicePush(subscription.endpoint, subscription); return; }
+        if (error || data?.error) throw new Error(data?.error || error?.message || "Registration failed.");
+        localStorage.setItem(DEVICE_PUSH_KEY, JSON.stringify({technician, endpoint: subscription.endpoint}));
+        await refreshTechnicianDeviceUI();
+        if (current()) notificationFeedback("Notifications enabled for " + technician + ".");
     } catch (error) {
-        console.error("Change technician error:", error);
-        alert("Could not disable the current notification registration: " + error.message);
+        clearPushBinding();
+        if (subscription) await cleanupDevicePush(subscription.endpoint, subscription);
+        if (current()) notificationFeedback("Notifications OFF — " + stage + ": " + (error?.message || "Setup failed. Try again."), true);
+    } finally { notificationBusy = false; }
+}
+
+function changeTechnician() {
+    if (!confirm("Change technician? Notifications for the current technician will be disabled on this device.")) return;
+    const binding = readPushBinding();
+    notificationEpoch++;
+    technicianOverride = null;
+    selectedTechnician = null;
+    // Reset local identity and UI before starting any asynchronous push cleanup.
+    try { localStorage.removeItem(DEVICE_TECH_KEY); }
+    catch (error) {
+        try { localStorage.setItem(DEVICE_TECH_KEY, ""); } catch (storageError) { console.error(storageError); }
     }
+    clearPushBinding();
+    document.getElementById("techROResults").style.display = "none";
+    document.getElementById("techLookupResults").style.display = "none";
+    void refreshTechnicianDeviceUI();
+    const status = document.getElementById("techLookupStatus");
+    status.textContent = "Technician cleared. Choose a technician. Notifications are OFF until you enable them.";
+    status.className = "tech-lookup-status success";
+    pushCleanupTask = pushCleanupTask.then(async () => {
+        try {
+            const cleaned = await cleanupDevicePush(binding?.endpoint);
+            if (!cleaned && !getRememberedTechnician()) {
+                status.textContent = "Technician cleared. Push cleanup could not finish; old alerts may still arrive. Reconnect and try enabling notifications after selecting your technician.";
+                status.className = "tech-lookup-status error";
+            }
+        } catch (error) { console.error("Best-effort push cleanup:", error); }
+    });
 }
 
 async function assignRepairOrder() {
@@ -1880,6 +1997,7 @@ async function setActiveRO() {
     roInput.style.backgroundColor = "#ecfdf3";
     roInput.style.fontWeight = "bold";
     localStorage.setItem("bodyshop_last_ro", roNumber);
+    void loadReceiveChecklist();
     toast(`RO ${roNumber} is active and ready for receiving.`, "success", 2200);
     document.getElementById("partNumber").focus();
 }
@@ -2359,6 +2477,8 @@ async function receivePart() {
         return;
     }
 
+    void loadReceiveChecklist(partNumber);
+
     /*
      * Automatically add newly received parts to the catalog.
      * Existing catalog entries are never overwritten.
@@ -2626,6 +2746,7 @@ async function deleteReceivedPart(id, roNumber, partNumber) {
 
     await loadAllParts();
     await loadRecentParts();
+    await loadReceiveChecklist();
     // Successful deletes refresh the list silently.
 }
 
@@ -2679,22 +2800,71 @@ function showStatus(message, type) {
    AUTO/MATE PARTS LIST PDF IMPORT
 ========================================================= */
 
-let previewedPartsImport = null;
+let previewedPartsImports = [];
+let partsImportBusy = false;
+let partsPreviewVersion = 0;
 
 function setPartsImportPreview(message, type = "") {
     const box = document.getElementById("partsImportPreview");
     if (!box) return;
     box.textContent = message;
     box.className = "status" + (type ? " " + type : "");
+    box.style.display = message ? "block" : "none";
+}
+
+function updatePartsImportControls() {
+    const button = document.getElementById("importPartsButton");
+    if (button) button.disabled = partsImportBusy || !previewedPartsImports.some(entry => entry.status === "ready");
+    for (const id of ["partsListPdf", "clearPartsImportButton"]) {
+        const control = document.getElementById(id);
+        if (control) control.disabled = partsImportBusy;
+    }
+}
+
+function renderPartsImportBatch() {
+    const box = document.getElementById("partsImportBatch");
+    if (!box) return;
+    box.replaceChildren();
+    for (const entry of previewedPartsImports) {
+        const card = document.createElement("div");
+        card.className = "soft-card";
+        card.style.marginTop = "10px";
+        card.style.overflowWrap = "anywhere";
+        const title = document.createElement("strong");
+        title.textContent = entry.file_name;
+        const counts = document.createElement("div");
+        counts.textContent = "RO " + (entry.ro_number || "Not identified") + " — " + entry.parts.length + " unique parts / " + entry.total_pieces + " total pieces";
+        const result = document.createElement("div");
+        result.style.marginTop = "5px";
+        result.style.color = entry.status === "failed" ? "var(--danger)" : entry.status === "imported" ? "var(--green)" : "var(--muted)";
+        result.textContent = entry.error ? "Failed: " + entry.error : entry.result || (entry.status === "importing" ? "Importing..." : "Ready to import");
+        card.append(title, counts, result);
+        if (entry.status === "imported") {
+            const open = document.createElement("button");
+            open.type = "button";
+            open.className = "primary";
+            open.style.marginTop = "10px";
+            open.textContent = "CHECK RECEIVED PARTS";
+            open.addEventListener("click", () => {
+                document.getElementById("roNumber").value = entry.ro_number;
+                goToPage("receivePage");
+                document.getElementById("receiveChecklistCard").scrollIntoView({behavior:"smooth", block:"start"});
+            });
+            card.append(open);
+        }
+        box.append(card);
+    }
 }
 
 function clearPartsImport() {
-    previewedPartsImport = null;
+    if (partsImportBusy) return;
+    partsPreviewVersion++;
+    previewedPartsImports = [];
     const input = document.getElementById("partsListPdf");
-    const button = document.getElementById("importPartsButton");
     if (input) input.value = "";
-    if (button) button.disabled = true;
     setPartsImportPreview("", "");
+    renderPartsImportBatch();
+    updatePartsImportControls();
 }
 
 function normalizeImportedPartNumber(value) {
@@ -2756,40 +2926,15 @@ function groupPdfItemsIntoLines(items) {
     );
 }
 
-async function previewPartsListPdf(file) {
-    if (!requireAdmin()) {
-        clearPartsImport();
-        return;
-    }
 
-    previewedPartsImport = null;
-    const importButton = document.getElementById("importPartsButton");
-    if (importButton) importButton.disabled = true;
-
-    if (!file) {
-        setPartsImportPreview("Choose an Auto/Mate Part Preview PDF.", "error");
-        return;
-    }
-
-    if (!file.name.toLowerCase().endsWith(".pdf")) {
-        setPartsImportPreview("Please choose a PDF file.", "error");
-        return;
-    }
-
-    if (!window.pdfjsLib) {
-        setPartsImportPreview("The PDF reader did not load. Check the internet connection and reload the app.", "error");
-        return;
-    }
-
-    setPartsImportPreview("Reading parts list...", "");
-
+async function parsePartsListPdf(file) {
+    if (!/\.pdf$/i.test(file.name)) throw new Error("Please choose a PDF file.");
+    if (!window.pdfjsLib) throw new Error("The PDF reader did not load. Check the internet connection and reload the app.");
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const loadingTask = pdfjsLib.getDocument({ data: bytes });
     try {
-        pdfjsLib.GlobalWorkerOptions.workerSrc =
-            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-
-        const bytes = new Uint8Array(await file.arrayBuffer());
-        const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
-
+        const pdf = await loadingTask.promise;
         let roNumber = "";
         const importedMap = new Map();
 
@@ -2799,9 +2944,13 @@ async function previewPartsListPdf(file) {
             const lines = groupPdfItemsIntoLines(textContent.items);
 
             for (const line of lines) {
-                if (!roNumber) {
+                {
                     const roMatch = line.match(/Part\s+Preview\s+RO\s*#?\s*([A-Z0-9-]+)/i);
-                    if (roMatch) roNumber = String(roMatch[1]).trim();
+                    if (roMatch) {
+                        const foundRO = String(roMatch[1]).trim();
+                        if (roNumber && foundRO !== roNumber) throw new Error("This PDF contains multiple ROs. Choose one Part Preview PDF per RO.");
+                        roNumber = foundRO;
+                    }
                 }
 
                 const parsed = parseAutoMateTextLine(line);
@@ -2823,51 +2972,64 @@ async function previewPartsListPdf(file) {
         const totalPieces = parts.reduce((sum, part) => sum + part.quantity, 0);
 
         if (!roNumber) {
-            setPartsImportPreview("I could not find the RO number in this PDF. Make sure it is an Auto/Mate Part Preview report.", "error");
-            return;
+            throw new Error("Could not find the RO number. Use an Auto/Mate Part Preview report.");
         }
 
         if (!parts.length) {
-            setPartsImportPreview("I found RO " + roNumber + " but could not read any parts from the report.", "error");
-            return;
+            const error = new Error("Could not read any parts from the report.");
+            error.ro_number = roNumber;
+            throw error;
         }
 
-        previewedPartsImport = {
+        return {
             ro_number: roNumber,
             parts: parts,
             total_pieces: totalPieces,
             file_name: file.name
         };
 
-        setPartsImportPreview(
-            `RO ${roNumber} — found ${parts.length} unique part number${parts.length === 1 ? "" : "s"}, ${totalPieces} total piece${totalPieces === 1 ? "" : "s"}. Ready to import.`,
-            "success"
-        );
 
-        if (importButton) importButton.disabled = false;
-    } catch (error) {
-        console.error("Could not read parts PDF:", error);
-        setPartsImportPreview("Could not read this PDF. " + (error.message || "Unknown PDF error."), "error");
+    } finally {
+        try { await loadingTask.destroy(); } catch (error) { console.warn("PDF cleanup failed:", error); }
     }
 }
 
-async function importPreviewedParts() {
-    if (!requireAdmin()) return;
-
-    if (!previewedPartsImport || !previewedPartsImport.parts.length) {
-        setPartsImportPreview("Choose and preview a parts list first.", "error");
-        return;
-    }
-
-    const button = document.getElementById("importPartsButton");
-    if (button) button.disabled = true;
-
-    const parts = previewedPartsImport.parts;
-    const partNumbers = parts.map(part => part.part_number);
-
-    setPartsImportPreview("Importing parts to catalog...", "");
-
+async function previewPartsListPdf(files) {
+    if (partsImportBusy) return;
+    if (!requireAdmin()) { clearPartsImport(); return; }
+    const selectedFiles = Array.from(files || []);
+    const version = ++partsPreviewVersion;
+    previewedPartsImports = [];
+    if (!selectedFiles.length) { clearPartsImport(); return; }
+    partsImportBusy = true;
+    updatePartsImportControls();
+    renderPartsImportBatch();
     try {
+        for (let index = 0; index < selectedFiles.length; index++) {
+            const file = selectedFiles[index];
+            setPartsImportPreview("Reading PDF " + (index + 1) + " of " + selectedFiles.length + "...");
+            let entry;
+            try {
+                entry = { ...await parsePartsListPdf(file), status: "ready", error: "" };
+            } catch (error) {
+                entry = { file_name: file.name, ro_number: error.ro_number || "", parts: [], total_pieces: 0, status: "failed", error: error.message || "Unknown PDF error." };
+            }
+            if (version !== partsPreviewVersion) return;
+            previewedPartsImports.push(entry);
+            renderPartsImportBatch();
+        }
+        const valid = previewedPartsImports.filter(entry => entry.status === "ready").length;
+        const failed = previewedPartsImports.length - valid;
+        setPartsImportPreview(valid + " ready to import, " + failed + " failed. Each valid PDF saves its own expected list. For repeated ROs, the last selected PDF imported becomes current.", valid ? "success" : "error");
+    } finally {
+        partsImportBusy = false;
+        updatePartsImportControls();
+    }
+}
+
+async function savePartsImport(entry) {
+    const parts = entry.parts;
+    const partNumbers = parts.map(part => part.part_number);
         const { data: existingParts, error: existingError } = await supabaseClient
             .from("parts_catalog")
             .select("part_number, part_name")
@@ -2928,10 +3090,10 @@ async function importPreviewedParts() {
         const { error: historyError } = await supabaseClient
             .from("parts_import_history")
             .insert({
-                ro_number: previewedPartsImport.ro_number,
+                ro_number: entry.ro_number,
                 part_count: parts.length,
-                total_pieces: previewedPartsImport.total_pieces,
-                file_name: previewedPartsImport.file_name,
+                total_pieces: entry.total_pieces,
+                file_name: entry.file_name,
                 parts: parts.map(part => ({
                     part_number: part.part_number,
                     part_name: part.part_name,
@@ -2940,17 +3102,46 @@ async function importPreviewedParts() {
             });
         if (historyError) throw historyError;
 
-        invalidateCatalogCache();
-        await loadCatalog(true);
 
-        setPartsImportPreview(
-            `RO ${previewedPartsImport.ro_number} imported: ${newParts.length} new, ${placeholderUpdates.length} filled in, ${keptExisting} already in catalog. Expected list saved. Scan the physical parts normally to verify what is actually here.`,
-            "success"
-        );
-    } catch (error) {
-        console.error("Parts list import failed:", error);
-        setPartsImportPreview("Import failed: " + (error.message || "Unknown error."), "error");
-        if (button) button.disabled = false;
+    return newParts.length + " new, " + placeholderUpdates.length + " filled in, " + keptExisting + " already in catalog. Expected list saved.";
+}
+
+async function importPreviewedParts() {
+    if (partsImportBusy || !requireAdmin()) return;
+    const pending = previewedPartsImports.filter(entry => entry.status === "ready");
+    if (!pending.length) { setPartsImportPreview("Choose and preview parts lists first.", "error"); return; }
+    partsImportBusy = true;
+    updatePartsImportControls();
+    try {
+        for (const entry of pending) {
+            entry.status = "importing";
+            setPartsImportPreview("Importing RO " + entry.ro_number + "...");
+            renderPartsImportBatch();
+            try {
+                entry.result = "Imported: " + await savePartsImport(entry);
+                entry.status = "imported";
+            } catch (error) {
+                console.error("Parts list import failed:", error);
+                entry.status = "failed";
+                entry.error = error.message || "Unknown import error.";
+            }
+            renderPartsImportBatch();
+        }
+        const imported = previewedPartsImports.filter(entry => entry.status === "imported").length;
+        const failed = previewedPartsImports.filter(entry => entry.status === "failed").length;
+        let refreshNote = "";
+        if (imported) {
+            invalidateCatalogCache();
+            void loadReceiveChecklist();
+            try { await loadCatalog(true); } catch (error) {
+                console.error("Catalog refresh failed:", error);
+                refreshNote = " Imports are saved; reload the catalog to refresh its display.";
+            }
+        }
+        setPartsImportPreview(imported + " imported, " + failed + " failed." + refreshNote, failed ? "error" : "success");
+    } finally {
+        partsImportBusy = false;
+        updatePartsImportControls();
     }
 }
 
@@ -3530,6 +3721,153 @@ function buildPartsVerification(expectedParts, receivedParts, catalogMap = new M
         extraPieces,
         complete: expectedPieces > 0 && missingPieces === 0
     };
+}
+
+let receiveChecklistVersion = 0;
+let receiveChecklistTimer = null;
+let receiveChecklistState = null;
+let receiveManualBusy = false;
+
+function chooseChecklistRO(value) {
+    document.getElementById("roNumber").value = value;
+    scheduleReceiveChecklist();
+}
+
+function scheduleReceiveChecklist() {
+    document.getElementById("receiveChecklistRO").value = document.getElementById("roNumber").value;
+    clearReceiveChecklist();
+    receiveChecklistTimer = setTimeout(() => loadReceiveChecklist(), 350);
+}
+
+function clearReceiveChecklist() {
+    clearTimeout(receiveChecklistTimer);
+    receiveChecklistVersion++;
+    receiveChecklistState = null;
+    document.getElementById("receiveChecklistStatus").textContent = "Enter an RO to view its expected parts.";
+    document.getElementById("receiveChecklistSummary").style.display = "none";
+    document.getElementById("receiveChecklistResults").style.display = "none";
+    document.getElementById("receiveChecklistTable").innerHTML = "";
+    document.getElementById("receiveChecklistFeedback").textContent = "";
+    document.getElementById("receiveChecklistManualStatus").textContent = "";
+}
+
+async function receiveExpectedListKey(importRow) {
+    // Version checks are scoped to the exact import; re-imports start unchecked.
+    const bytes = new TextEncoder().encode(JSON.stringify([importRow.imported_at, importRow.file_name, importRow.parts]));
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2, "0")).join("");
+}
+
+function renderReceiveChecklist(lastPartNumber = "") {
+    const state = receiveChecklistState;
+    if (!state) return;
+    const v = state.verification;
+    const manuallyChecked = v.rows.reduce((sum, row) => sum + (state.manualKeys.has(row.key) ? Math.max(row.expected-row.scanned, 0) : 0), 0);
+    const summary = document.getElementById("receiveChecklistSummary");
+    summary.style.display = "block";
+    summary.className = "verification-banner " + (v.expectedPieces > 0 && v.missingPieces === manuallyChecked ? "complete" : "incomplete");
+    summary.textContent = (v.verifiedPieces + manuallyChecked) + " / " + v.expectedPieces + " received • " + (v.missingPieces - manuallyChecked) + " missing • " + v.verifiedPieces + " scanned • " + manuallyChecked + " manually confirmed" + (v.extraPieces ? " • " + v.extraPieces + " extra" : "");
+    const key = normalizeVerificationPartNumber(lastPartNumber);
+    document.getElementById("receiveChecklistTable").innerHTML = v.rows.map((row, index) => {
+        const checked = state.manualKeys.has(row.key);
+        const locations = row.locations.length ? '<div class="verification-location">Location: ' + escapeHtml(row.locations.join(", ")) + '</div>' : "";
+        const manual = checked ? '<span class="manual-badge">✓ RECEIVED — manually confirmed</span>' : "";
+        const action = row.expected > row.scanned && state.manualAvailable ? '<button type="button" class="secondary" onclick="markReceiveExpectedPart(' + index + ')"' + (receiveManualBusy ? ' disabled' : '') + '>' + (checked ? 'UNDO CONFIRMATION' : 'CONFIRM RECEIVED') + '</button>' : "";
+        return '<tr' + (key && row.key === key ? ' class="just-scanned"' : '') + '><td data-label="Part Number">' + escapeHtml(row.part_number) + '</td><td data-label="Description">' + escapeHtml(row.part_name) + locations + '</td><td data-label="Expected">' + row.expected + '</td><td data-label="Scanned">' + row.scanned + '</td><td data-label="Status">' + (checked && row.expected > row.scanned ? '' : verificationBadge(row.status)) + manual + action + '</td></tr>';
+    }).join("");
+    document.getElementById("receiveChecklistResults").style.display = "block";
+    if (key) {
+        const row = v.rows.find(row => row.key === key);
+        document.getElementById("receiveChecklistFeedback").textContent = row ? row.part_number + " — " + (row.status === "extra" ? "EXTRA PART — not on expected list" : row.status === "over" ? "EXTRA QTY" : row.status.toUpperCase()) + " — scanned " + row.scanned + " / " + row.expected : "Part received.";
+    }
+}
+
+async function loadReceiveChecklist(lastPartNumber = "") {
+    const roNumber = document.getElementById("roNumber").value.trim();
+    document.getElementById("receiveChecklistRO").value = roNumber;
+    clearReceiveChecklist();
+    if (!roNumber || !isAdmin) return;
+    const version = receiveChecklistVersion;
+    const current = () => version === receiveChecklistVersion && isAdmin && document.getElementById("roNumber").value.trim() === roNumber;
+    const status = document.getElementById("receiveChecklistStatus");
+    status.textContent = "Loading expected parts for RO " + roNumber + "...";
+    try {
+        const { data: importRow, error: importError } = await supabaseClient.from("parts_import_history")
+            .select("parts, file_name, imported_at").eq("ro_number", roNumber)
+            .order("imported_at", { ascending: false }).limit(1).maybeSingle();
+        if (importError) throw importError;
+        if (!current()) return;
+        if (!importRow || !Array.isArray(importRow.parts) || !importRow.parts.length) {
+            status.textContent = "RO " + roNumber + " has no saved expected parts list. Import its Auto/Mate Part Preview PDF. You can still receive parts.";
+            return;
+        }
+        const [roNumbers, listKey] = await Promise.all([getVerificationRONumbers(roNumber), receiveExpectedListKey(importRow)]);
+        const [physical, manual] = await Promise.all([
+            supabaseClient.from("parts").select("ro_number, part_number, quantity, location, received_at").in("ro_number", roNumbers.length ? roNumbers : [roNumber]),
+            supabaseClient.from("parts_manual_checks").select("part_key").eq("ro_number", roNumber).eq("list_key", listKey)
+        ]);
+        if (physical.error) throw physical.error;
+        if (!current()) return;
+        // Catalog enrichment must never delay the expected checklist or block receipts.
+        receiveChecklistState = {roNumber, listKey, version, manualAvailable: !manual.error,
+            manualKeys: new Set((manual.data || []).map(row => row.part_key)),
+            verification: buildPartsVerification(importRow.parts, physical.data || [])};
+        status.textContent = "RO " + roNumber + " — " + (importRow.file_name || "Latest Auto/Mate list") + (roNumbers.length > 1 ? " • Scans from paired ROs " + roNumbers.join(" / ") : "") + (importRow.imported_at ? " • " + new Date(importRow.imported_at).toLocaleString() : "");
+        document.getElementById("receiveChecklistManualStatus").textContent = manual.error ? "Manual checks unavailable. Apply the supplied SQL migration and check admin access. Scanned verification still works." : "CONFIRM RECEIVED marks the remaining expected quantity as received without a barcode scan. Scanned counts stay separate.";
+        renderReceiveChecklist(lastPartNumber);
+        try {
+            const catalog = await fetchCatalogMap((physical.data || []).map(row => row.part_number));
+            if (current() && receiveChecklistState?.version === version) {
+                receiveChecklistState.verification = buildPartsVerification(importRow.parts, physical.data || [], catalog);
+                renderReceiveChecklist(lastPartNumber);
+            }
+        } catch (catalogError) { console.error("Checklist catalog enrichment failed:", catalogError); }
+    } catch (error) {
+        console.error("Receive checklist failed:", error);
+        if (current()) status.textContent = "Could not load the parts checklist. Receiving still works. Use Refresh List to retry.";
+    }
+}
+
+async function markReceiveExpectedPart(index) {
+    const state = receiveChecklistState;
+    const row = state?.verification.rows[index];
+    if (!isAdmin || !state?.manualAvailable || !row || row.expected <= row.scanned || receiveManualBusy) return;
+    const checked = state.manualKeys.has(row.key);
+    receiveManualBusy = true;
+    renderReceiveChecklist();
+    try {
+        // Re-read latest import before saving so a newly imported list cannot inherit old checks.
+        const {data: latest, error: latestError} = await supabaseClient.from("parts_import_history")
+            .select("parts, file_name, imported_at").eq("ro_number", state.roNumber)
+            .order("imported_at", {ascending:false}).limit(1).maybeSingle();
+        if (latestError) throw latestError;
+        if (receiveChecklistState !== state) return;
+        if (!latest || await receiveExpectedListKey(latest) !== state.listKey) {
+            await loadReceiveChecklist();
+            return;
+        }
+        let result;
+        if (checked) {
+            result = await supabaseClient.from("parts_manual_checks").delete()
+                .eq("ro_number", state.roNumber).eq("list_key", state.listKey).eq("part_key", row.key);
+        } else {
+            result = await supabaseClient.from("parts_manual_checks").upsert({
+                ro_number: state.roNumber, list_key: state.listKey, part_key: row.key,
+                checked_at: new Date().toISOString()
+            }, {onConflict:"ro_number,list_key,part_key"});
+        }
+        if (result.error) throw result.error;
+        if (receiveChecklistState === state) {
+            if (checked) state.manualKeys.delete(row.key); else state.manualKeys.add(row.key);
+            document.getElementById("receiveChecklistManualStatus").textContent = checked ? "Receipt confirmation removed." : row.part_number + " received — manually confirmed. Scanned quantities are unchanged.";
+        }
+    } catch (error) {
+        console.error("Manual check failed:", error);
+        if (receiveChecklistState === state) document.getElementById("receiveChecklistManualStatus").textContent = "Manual check was not saved. Please retry. " + (error.message || "");
+    } finally {
+        receiveManualBusy = false;
+        renderReceiveChecklist();
+    }
 }
 
 function renderPartsVerification(roNumber, verification, importDate = "") {
