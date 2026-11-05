@@ -57,12 +57,14 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 @media(max-width:900px){.dashboard-lower{grid-template-columns:1fr!important}}
 
 #receiveChecklistTable .manual-badge{display:block;color:#795100;font-weight:800;margin:7px 0;white-space:normal} #receiveChecklistTable button{min-height:44px;margin-top:8px;font-size:12px} #receiveChecklistTable tr.just-scanned{background:var(--green-soft);outline:2px solid var(--green);outline-offset:-2px} #receiveChecklistTable td{overflow-wrap:anywhere} @media(max-width:600px){#receiveChecklistResults table,#receiveChecklistTable,#receiveChecklistTable tr,#receiveChecklistTable td{display:block;width:100%;box-sizing:border-box} #receiveChecklistResults thead{display:none} #receiveChecklistTable tr{padding:10px;border-bottom:2px solid var(--line)} #receiveChecklistTable td{border:0;padding:5px;white-space:normal} #receiveChecklistTable td:before{content:attr(data-label) ": ";font-weight:800} #receiveChecklistTable td:last-child:before{content:""}}
+body.private-billing-mode{padding:16px} body.private-billing-mode > :not(#privateBillingPanel):not(script){display:none!important}
 </style>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#111419">
 <link rel="apple-touch-icon" href="icon-192.png">
 </head> <body>
+<section id="privateBillingPanel" class="card" hidden><h1 id="privateBillingTitle">Parts billed and confirmed</h1><label for="privateBillingRO">Repair order</label><select id="privateBillingRO"></select><p id="privateBillingStatus" role="status">Checking private link…</p><div class="table-wrapper"><table><thead><tr><th>Part</th><th>Description</th><th>Billed</th><th>Confirmed Here</th><th>Still to Confirm</th></tr></thead><tbody id="privateBillingRows"></tbody></table></div></section>
 <header class="topbar">
   <div class="brand-lockup">
     <div class="brand-kicker">Lynch Toyota</div>
@@ -318,7 +320,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 
         <div class="form-grid">
             <div class="full">
-                <label for="partsListPdf">Auto/Mate Part Preview PDFs</label>
+                <details class="card"><summary>Parts Billed — shared export and tech links</summary><p>Download the Export tab as CSV. Only collision RO, part, description and quantity are saved.</p><label for="billingCsv">Billing export CSV</label><input id="billingCsv" type="file" accept=".csv,text/csv" onchange="previewBillingCsv(this.files[0])"><button id="billingPublish" class="primary" disabled onclick="publishBillingCsv()">PUBLISH BILLING EXPORT</button><label for="billingTechName">Technician name</label><input id="billingTechName" placeholder="Exact name from Tech Lookup"><button class="secondary" onclick="makeShopBillingLink()">CREATE PRIVATE LINK</button><input id="billingLinkOutput" aria-label="Private technician link" readonly><p id="billingAdminStatus" role="status"></p></details>
+<label for="partsListPdf">Auto/Mate Part Preview PDFs</label>
                 <input id="partsListPdf" type="file" accept="application/pdf,.pdf" multiple onchange="previewPartsListPdf(this.files)">
             </div>
 
@@ -4334,7 +4337,115 @@ async function startApp() {
     window.bodyShopAuthListener = listener;
 }
 
-startApp();
+let billingRows;
+function parseBillingCsv(text) {
+    const rows = []; let row=[], cell='', quoted=false, ended=false;
+    text = text.replace(/^\uFEFF/, '');
+    for(let i=0;i<text.length;i++) {
+        const c=text[i];
+        if(quoted) {
+            if(c==='"' && text[i+1]==='"') {cell+='"';i++;}
+            else if(c==='"') {quoted=false;ended=true;}
+            else cell+=c;
+        } else if(c===',' || c==='\n' || c==='\r') {
+            row.push(cell);cell='';ended=false;
+            if(c!==','){rows.push(row);row=[];if(c==='\r'&&text[i+1]==='\n') i++;}
+        } else if(c==='"' && !cell && !ended) quoted=true;
+        else if(ended || c==='"') throw Error('Malformed CSV.');
+        else cell+=c;
+    }
+    if(quoted) throw Error('Unclosed CSV quote.');
+    rows.push([...row,cell]);
+    const headers=rows.shift().map(v=>v.trim().toLowerCase());
+    const cols=['ro no','part no','desc','qty'].map(h=>headers.indexOf(h));
+    if(cols.some(i=>i<0)) throw Error('Use the Export tab CSV with RO No, Part No, Desc and Qty.');
+    const out=[];
+    for(const [i,values] of rows.entries()) {
+        const [ro,part,description,amount]=cols.map(j=>(values[j]||'').trim());
+        if(!/^\d{4}$/.test(ro)) continue;
+        const qty=Number(amount);
+        if(!normalizeVerificationPartNumber(part)||!amount||!Number.isFinite(qty)||Math.abs(qty)>100000||part.length>100||description.length>300)
+            throw Error('Invalid part or quantity in CSV row '+(i+2));
+        out.push({ro,part,description,qty});
+    }
+    if(!out.length||out.length>50000) throw Error('The CSV must contain 1 to 50,000 collision part lines.');
+    return out;
+}
+async function previewBillingCsv(file) {
+    const status=document.getElementById('billingAdminStatus'), button=document.getElementById('billingPublish');
+    billingRows=null;button.disabled=true;
+    if(!requireAdmin()||!file)return;
+    try {
+        if(file.size>20_000_000)throw Error('Export is too large.');
+        billingRows=parseBillingCsv(await file.text());
+        status.textContent=billingRows.length+' collision part lines ready. Publishing replaces the prior shared export.';
+        button.disabled=false;
+    } catch(e){status.textContent=e.message;}
+}
+async function publishBillingCsv() {
+    if(!requireAdmin()||!billingRows)return;
+    const button=document.getElementById('billingPublish'), status=document.getElementById('billingAdminStatus');
+    button.disabled=true;
+    const {error,data}=await supabaseClient.rpc('shop_billing_replace_export',{items:billingRows});
+    status.textContent=error?'Could not publish: '+error.message:data+' billing lines published.';
+    if(error)button.disabled=false;
+}
+async function makeShopBillingLink() {
+    if(!requireAdmin())return;
+    const tech=document.getElementById('billingTechName').value.trim(), status=document.getElementById('billingAdminStatus');
+    if(!tech)return;
+    if(!confirm('Create a new link for '+tech+'? Any previous billing link for this technician will stop working.'))return;
+    const {data,error}=await supabaseClient.rpc('shop_billing_issue_link',{tech});
+    const box=document.getElementById('billingLinkOutput');
+    box.value=error?'':location.origin+location.pathname+'#billed='+data;
+    status.textContent=error?error.message:'Copy this link and give it to '+tech+'.';
+}
+async function openPrivateBilling() {
+    const token=new URLSearchParams(location.hash.slice(1)).get('billed');
+    if(!token)return;
+    const panel=document.getElementById('privateBillingPanel'), picker=document.getElementById('privateBillingRO'), status=document.getElementById('privateBillingStatus');
+    document.body.classList.add('private-billing-mode');
+    panel.hidden=false;
+    const {data,error}=await supabaseClient.rpc('shop_billing_lookup',{secret:token});
+    if(error||!data){status.textContent='This billing link is unavailable. Ask the parts desk for a new link.';return;}
+    document.getElementById('privateBillingTitle').textContent='Parts for '+data.technician;
+    picker.replaceChildren(new Option('Choose an RO',''),...data.ros.sort().map(ro=>new Option('RO '+ro,ro)));
+    status.textContent=data.ros.length?'Choose a repair order.':'No open ROs are assigned to you.';
+    let version=0;
+    picker.addEventListener('change',async()=>{
+        const id=++version, ro=picker.value, table=document.getElementById('privateBillingRows');
+        table.replaceChildren();
+        if(!ro){status.textContent='Choose a repair order.';return;}
+        status.textContent='Loading parts…';
+        try {
+            const {data,error}=await supabaseClient.rpc('shop_billing_lookup',{secret:token,requested_ro:ro});
+            if(error||!data)throw Error('Unavailable');
+            const key=data.expected?await receiveExpectedListKey(data.expected):null;
+            if(id!==version)return;
+            const checked=new Set(data.checks.filter(c=>c.list_key===key).map(c=>c.part_key)), map=new Map();
+            function line(part,description) {
+                const k=normalizeVerificationPartNumber(part);
+                if(!k)return null;
+                if(!map.has(k))map.set(k,{k,part,description,billed:0,scanned:0,expected:0});
+                const row=map.get(k);if(!row.description&&description)row.description=description;
+                return row;
+            }
+            for(const p of data.billed){const r=line(p.part,p.description);if(r)r.billed+=Number(p.qty);}
+            for(const p of data.scanned){const r=line(p.part,'');if(r)r.scanned+=Number(p.qty);}
+            for(const p of data.expected?.parts||[]){const r=line(p.part_number,p.part_name);if(r)r.expected+=Number(p.quantity);}
+            for(const r of map.values()) {
+                const tr=document.createElement('tr'), here=checked.has(r.k)?Math.max(r.scanned,r.expected):r.scanned;
+                for(const value of [r.part,r.description,data.imported_at?r.billed:'—',here,data.imported_at?Math.max(0,r.billed-here):'—']){
+                    const td=document.createElement('td');td.textContent=value;tr.append(td);
+                }
+                table.append(tr);
+            }
+            status.textContent=(data.imported_at?'Export loaded '+new Date(data.imported_at).toLocaleString():'No billing export published yet.')+(map.size?'':' No part lines for this RO.');
+        } catch(e){if(id===version)status.textContent='Could not load parts for this RO.';}
+    });
+}
+
+if(new URLSearchParams(location.hash.slice(1)).has("billed")) openPrivateBilling(); else startApp();
 
 </script>
 <script>
